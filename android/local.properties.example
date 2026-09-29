@@ -1,0 +1,7 @@
+## Physics Lab — Android Local Properties Example
+##
+## Copy this file to `local.properties` (gitignored) on your development machine.
+## Do NOT commit your machine-specific `local.properties` to version control.
+##
+## Recommended D: drive configuration:
+sdk.dir=D\:\\Android\\Sdk

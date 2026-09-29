@@ -1,0 +1,38 @@
+# === OS ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# === Node.js / simulation-web ===
+node_modules/
+simulation-web/dist/
+simulation-web/.vite/
+*.tsbuildinfo
+
+# === Android ===
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# === Gradle ===
+.gradle/
+
+# === Android bundled web assets (generated) ===
+android/app/src/main/assets/simulation-web/
+
+# === Environment ===
+.env
+.env.local
