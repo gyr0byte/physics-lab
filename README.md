@@ -4,42 +4,56 @@ Interactive physics simulations for Grade 11 and Grade 12 students, following th
 
 ## Status
 
-**Version 0.1.0** — First vertical slice.
+**Version 0.1.0** — First vertical slice (Hardened).
 
 | Component | Status |
 |-----------|--------|
 | Simulation engine (TypeScript) | ✅ Working |
-| Projectile Motion simulation | ✅ Working |
-| Physics tests | ✅ 47 tests passing |
-| Web build | ✅ Builds (23 KB bundle) |
+| Projectile Motion simulation | ✅ Working (offline font stack, relative asset paths, idempotent loop, 90° robust sampling) |
+| Core & Physics unit tests | ✅ 61 tests passing (Vector2, SimulationClock, Camera2D, ProjectilePhysics) |
+| Web build (Vite + TS) | ✅ Builds with relative paths (`./assets/...`) (25 KB bundle) |
 | Desktop browser development | ✅ Working |
-| Android TV shell (Kotlin/Compose) | ✅ Code complete |
-| WebView integration | ✅ Code complete |
-| APK build | ⏳ Requires SDK setup |
+| Android shell (Kotlin/Compose) | ✅ Code complete (security hardened, dual D-pad/touch support, lifecycle managed) |
+| WebView integration | ✅ Code complete with `WebViewAssetLoader`, CORS headers, and MIME mappings |
+| Gradle wrapper | ✅ Verified with Gradle 9.6.1 + AGP 9.4.0 |
+| Gradle build configuration | ✅ Memory tuned for host (`-Xmx1024m -XX:+UseSerialGC`) |
+| APK build | ✅ Working (`android/app/build/outputs/apk/debug/app-debug.apk`) |
+| Samsung Galaxy S21 FE testing | ✅ Verified on physical hardware (`[ANDROID-TEST-DEVICE]`, Android 14) |
+| Viewport & resolution testing | ✅ Verified at 2340×1080 native and 1920×1080 (16:9 TV baseline) |
+| Physical Android TV testing | ⏳ Pending: Awaiting physical TV hardware & remote testing |
+| Testing report | ✅ Documented in [docs/testing/first-vertical-slice.md](docs/testing/first-vertical-slice.md) |
 
-## Prerequisites
+## Prerequisites & D: Drive Setup
+
+To protect limited C: drive disk space, all large SDKs, build caches, and tools are configured for the **D:** drive.
 
 ### For simulation development (web only)
 
 - **Node.js** 20+ and npm
-- That's it — simulation development happens in the browser
+- Runs offline with zero external network requests (system font stack)
 
 ### For Android APK builds
 
-| Requirement | Location | Notes |
-|------------|----------|-------|
-| JDK 17 | `D:\jdk-17` | Set `JAVA_HOME` |
-| Android SDK | `D:\Android\Sdk` | Set `ANDROID_HOME` |
-| Gradle cache | `D:\Gradle` | Set `GRADLE_USER_HOME` |
-| SDK Platform | API 37 | Install via SDK Manager |
-| Build Tools | 36.0.0 | Install via SDK Manager |
+| Requirement | Target Location | Notes |
+|------------|-----------------|-------|
+| JDK 17 | `D:\jdk-17` | Set `JAVA_HOME=D:\jdk-17` (do not use JDK 25 for Android build) |
+| Android SDK | `D:\Android\Sdk` | Set `ANDROID_HOME=D:\Android\Sdk` |
+| Gradle user home / cache | `D:\Gradle` | Set `GRADLE_USER_HOME=D:\Gradle` (keeps caches off C:) |
+| SDK Platform | API 37 | Install via SDK Manager (`platforms;android-37`) |
+| Build Tools | 36.0.0 | Install via SDK Manager (`build-tools;36.0.0`) |
 
-**Environment variables:**
+**Environment setup (PowerShell):**
 
 ```powershell
 $env:JAVA_HOME = "D:\jdk-17"
 $env:ANDROID_HOME = "D:\Android\Sdk"
 $env:GRADLE_USER_HOME = "D:\Gradle"
+```
+
+**Machine-specific `local.properties`:**
+Do not commit `local.properties` (it is gitignored). You can copy `android/local.properties.example` to `android/local.properties`:
+```properties
+sdk.dir=D\:\\Android\\Sdk
 ```
 
 ## Quick Start

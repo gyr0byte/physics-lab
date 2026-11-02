@@ -60,8 +60,8 @@ export class SimulationClock {
     this._accumulator += frameDelta;
 
     let steps = 0;
-    while (this._accumulator >= this.fixedDt) {
-      this._accumulator -= this.fixedDt;
+    while (this._accumulator >= this.fixedDt - 1e-9) {
+      this._accumulator = Math.max(0, this._accumulator - this.fixedDt);
       this._elapsed += this.fixedDt;
       steps++;
     }

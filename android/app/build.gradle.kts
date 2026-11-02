@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -10,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.physicslab.app"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
@@ -31,12 +30,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

@@ -2,10 +2,13 @@ package com.physicslab.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
@@ -104,7 +107,13 @@ private fun TopicCard(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp),
+            .height(80.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable {
+                if (hasSimulations) {
+                    onSimulationSelected(simulationIds.first())
+                }
+            },
         colors = CardDefaults.colors(
             containerColor = if (hasSimulations) Color(0xFF161B22) else Color(0xFF0D1117),
             focusedContainerColor = if (hasSimulations) Color(0xFF1C2433) else Color(0xFF13181F)

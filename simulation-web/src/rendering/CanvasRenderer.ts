@@ -26,7 +26,7 @@ export function drawGrid(
     gridColor = 'rgba(255, 255, 255, 0.08)',
     axisColor = 'rgba(255, 255, 255, 0.4)',
     labelColor = 'rgba(255, 255, 255, 0.6)',
-    font = '13px "Inter", sans-serif',
+    font = '13px system-ui, -apple-system, sans-serif',
     xLabel = 'x (m)',
     yLabel = 'y (m)',
   } = options;
@@ -75,7 +75,7 @@ export function drawGrid(
 
   // Axis labels
   ctx.fillStyle = labelColor;
-  ctx.font = '14px "Inter", sans-serif';
+  ctx.font = '14px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   const xLabelPos = camera.worldToScreen(new Vector2(xRange / 2, 0));
@@ -146,7 +146,7 @@ export function drawVectorArrow(
 
   // Label
   if (label) {
-    ctx.font = '13px "Inter", sans-serif';
+    ctx.font = '13px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const labelX = screenEnd.x + 14 * Math.cos(angle);

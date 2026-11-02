@@ -63,6 +63,9 @@ export class ProjectileMotionSimulation implements Simulation {
   private _input = new InputManager();
   private _camera!: Camera2D;
   private _trajectoryPoints: Vector2[] = [];
+  private _lastTrajectorySampleTime: number = -1;
+  private _resizeListener: (() => void) | null = null;
+  private _resizeObserver: ResizeObserver | null = null;
   private _currentState: ProjectileState = {
     time: 0,
     position: Vector2.zero(),
@@ -93,12 +96,14 @@ export class ProjectileMotionSimulation implements Simulation {
     container.innerHTML = '';
     container.style.display = 'flex';
     container.style.flexDirection = 'column';
-    container.style.height = '100vh';
-    container.style.width = '100vw';
+    container.style.position = 'fixed';
+    container.style.inset = '0';
+    container.style.width = '100%';
+    container.style.height = '100%';
     container.style.overflow = 'hidden';
     container.style.backgroundColor = '#0d1117';
     container.style.color = '#e6edf3';
-    container.style.fontFamily = '"Inter", "Segoe UI", system-ui, sans-serif';
+    container.style.fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
     this._buildHeader();
     this._buildMainArea();
@@ -114,6 +119,7 @@ export class ProjectileMotionSimulation implements Simulation {
 
   start(): void {
     if (this._currentState.landed) return;
+    if (this._clock.running && this._animFrameId !== 0) return;
     this._clock.start();
     this._startLoop();
     this._updateButtonStates();
@@ -121,12 +127,21 @@ export class ProjectileMotionSimulation implements Simulation {
 
   pause(): void {
     this._clock.pause();
+    if (this._animFrameId !== 0) {
+      cancelAnimationFrame(this._animFrameId);
+      this._animFrameId = 0;
+    }
     this._updateButtonStates();
   }
 
   reset(): void {
     this._clock.reset();
+    if (this._animFrameId !== 0) {
+      cancelAnimationFrame(this._animFrameId);
+      this._animFrameId = 0;
+    }
     this._trajectoryPoints = [];
+    this._lastTrajectorySampleTime = -1;
     this._currentState = {
       time: 0,
       position: new Vector2(0, 0),
@@ -147,15 +162,18 @@ export class ProjectileMotionSimulation implements Simulation {
     }
 
     const params = this._getPhysicsParams();
+    const TRAJECTORY_SAMPLE_INTERVAL = 0.02; // Sample every 20ms in simulation time
 
     for (let i = 0; i < steps; i++) {
       this._currentState = computeProjectileState(params, this._clock.elapsed);
 
-      // Sample trajectory at reduced rate
-      if (this._trajectoryPoints.length === 0 ||
-          this._clock.elapsed - (this._trajectoryPoints[this._trajectoryPoints.length - 1]!.x / 
-            (params.initialSpeed * Math.cos(params.launchAngle) || 1)) > 0.001) {
+      // Trajectory sampling: sample based on simulation clock interval, independent of vx (robust at 90°)
+      if (
+        this._trajectoryPoints.length === 0 ||
+        this._clock.elapsed - this._lastTrajectorySampleTime >= TRAJECTORY_SAMPLE_INTERVAL
+      ) {
         this._trajectoryPoints.push(this._currentState.position.clone());
+        this._lastTrajectorySampleTime = this._clock.elapsed;
       }
 
       // Graph data
@@ -163,7 +181,13 @@ export class ProjectileMotionSimulation implements Simulation {
       this._graph.pushData(this._graphVySeries, this._clock.elapsed, this._currentState.velocity.y);
 
       if (this._currentState.landed) {
+        // Ensure final landing position is captured
+        this._trajectoryPoints.push(this._currentState.position.clone());
         this._clock.pause();
+        if (this._animFrameId !== 0) {
+          cancelAnimationFrame(this._animFrameId);
+          this._animFrameId = 0;
+        }
         break;
       }
     }
@@ -174,7 +198,18 @@ export class ProjectileMotionSimulation implements Simulation {
   }
 
   dispose(): void {
-    cancelAnimationFrame(this._animFrameId);
+    if (this._animFrameId !== 0) {
+      cancelAnimationFrame(this._animFrameId);
+      this._animFrameId = 0;
+    }
+    if (this._resizeListener) {
+      window.removeEventListener('resize', this._resizeListener);
+      this._resizeListener = null;
+    }
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
+    }
     this._input.detach();
     this._graph.dispose();
     this._container.innerHTML = '';
@@ -194,10 +229,16 @@ export class ProjectileMotionSimulation implements Simulation {
   // ── Animation loop ─────────────────────────────────────────────
 
   private _startLoop(): void {
+    if (this._animFrameId !== 0) {
+      cancelAnimationFrame(this._animFrameId);
+      this._animFrameId = 0;
+    }
     const loop = (timestamp: number) => {
       this.tick(timestamp);
       if (this._clock.running) {
         this._animFrameId = requestAnimationFrame(loop);
+      } else {
+        this._animFrameId = 0;
       }
     };
     this._animFrameId = requestAnimationFrame(loop);
@@ -255,9 +296,40 @@ export class ProjectileMotionSimulation implements Simulation {
     // Glow
     drawCircle(ctx, this._camera, this._currentState.position, 12, 'rgba(100, 181, 246, 0.2)');
 
-    // Velocity vector
-    if (this._currentState.velocity.magnitude() > 0.1) {
-      const velScale = 0.12;
+    const isPreLaunch = !this._clock.running && this._clock.elapsed === 0 && !this._currentState.landed;
+    const velScale = 0.12;
+
+    if (isPreLaunch) {
+      // Pedagogical distinction: At rest before launch, display initial velocity vector v₀
+      const v0 = new Vector2(
+        params.initialSpeed * Math.cos(params.launchAngle),
+        params.initialSpeed * Math.sin(params.launchAngle)
+      );
+      drawVectorArrow(ctx, this._camera, this._currentState.position, v0, '#66BB6A', {
+        label: 'v₀',
+        scale: velScale,
+        lineWidth: 2.5,
+      });
+
+      // Component vectors for initial velocity
+      const v0x = new Vector2(v0.x, 0);
+      const v0y = new Vector2(0, v0.y);
+      if (Math.abs(v0x.x) > 0.5) {
+        drawVectorArrow(ctx, this._camera, this._currentState.position, v0x, 'rgba(255, 167, 38, 0.7)', {
+          label: 'v₀ₓ',
+          scale: velScale,
+          lineWidth: 1.5,
+        });
+      }
+      if (Math.abs(v0y.y) > 0.5) {
+        drawVectorArrow(ctx, this._camera, this._currentState.position, v0y, 'rgba(239, 83, 80, 0.7)', {
+          label: 'v₀ᵧ',
+          scale: velScale,
+          lineWidth: 1.5,
+        });
+      }
+    } else if (this._currentState.velocity.magnitude() > 0.1) {
+      // Current instantaneous velocity vector in flight
       drawVectorArrow(ctx, this._camera, this._currentState.position, this._currentState.velocity, '#66BB6A', {
         label: 'v',
         scale: velScale,
@@ -298,7 +370,7 @@ export class ProjectileMotionSimulation implements Simulation {
       const rangeScreen = this._camera.worldToScreen(new Vector2(range, 0));
       ctx.save();
       ctx.fillStyle = 'rgba(100, 181, 246, 0.7)';
-      ctx.font = '13px "Inter", sans-serif';
+      ctx.font = '13px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.fillText(`R = ${range.toFixed(1)} m`, rangeScreen.x, rangeScreen.y - 8);
@@ -318,7 +390,7 @@ export class ProjectileMotionSimulation implements Simulation {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(239, 83, 80, 0.6)';
-      ctx.font = '12px "Inter", sans-serif';
+      ctx.font = '12px system-ui, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       ctx.fillText(`H = ${maxH.toFixed(1)} m`, maxHScreen.x + 8, maxHScreen.y - 4);
@@ -507,11 +579,25 @@ export class ProjectileMotionSimulation implements Simulation {
 
     // Size canvas after layout
     requestAnimationFrame(() => this._resizeCanvas());
-    window.addEventListener('resize', () => this._resizeCanvas());
+    this._resizeListener = () => this._resizeCanvas();
+    window.addEventListener('resize', this._resizeListener);
+
+    if (typeof ResizeObserver !== 'undefined' && this._canvas.parentElement) {
+      this._resizeObserver = new ResizeObserver(() => {
+        this._resizeCanvas();
+      });
+      this._resizeObserver.observe(this._canvas.parentElement);
+    }
   }
 
   private _resizeCanvas(): void {
-    const rect = this._canvas.parentElement!.getBoundingClientRect();
+    if (!this._canvas || !this._canvas.parentElement) return;
+    const rect = this._canvas.parentElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      // Container layout not ready yet, retry on next frame
+      requestAnimationFrame(() => this._resizeCanvas());
+      return;
+    }
     const dpr = window.devicePixelRatio || 1;
     this._canvas.width = rect.width * dpr;
     this._canvas.height = rect.height * dpr;
@@ -541,7 +627,7 @@ export class ProjectileMotionSimulation implements Simulation {
     }
   }
 
-  private _createParamControl(param: Parameter, _index: number): HTMLElement {
+  private _createParamControl(param: Parameter, index: number): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = `
       display: flex; align-items: center; justify-content: space-between;
@@ -550,8 +636,17 @@ export class ProjectileMotionSimulation implements Simulation {
       border: 2px solid transparent;
       transition: border-color 0.15s, background-color 0.15s;
       cursor: pointer; user-select: none;
+      -webkit-tap-highlight-color: transparent;
     `;
     wrapper.tabIndex = 0;
+
+    // Tap on the row itself focuses this parameter
+    wrapper.addEventListener('click', (e) => {
+      // Don't steal focus if an arrow was tapped (it bubbles)
+      if ((e.target as HTMLElement).dataset['arrow']) return;
+      this._focusedControl = index;
+      this._updateFocus();
+    });
 
     const labelEl = document.createElement('span');
     labelEl.textContent = param.label;
@@ -562,7 +657,20 @@ export class ProjectileMotionSimulation implements Simulation {
 
     const leftArrow = document.createElement('span');
     leftArrow.textContent = '◀';
-    leftArrow.style.cssText = 'font-size: 12px; color: rgba(255,255,255,0.3);';
+    leftArrow.dataset['arrow'] = 'left';
+    leftArrow.style.cssText = `
+      font-size: 18px; color: rgba(100, 181, 246, 0.7);
+      padding: 6px 10px; border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    `;
+    leftArrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._focusedControl = index;
+      this._updateFocus();
+      this._adjustParam(-1);
+    });
 
     const valueEl = document.createElement('span');
     valueEl.className = 'param-value';
@@ -574,7 +682,20 @@ export class ProjectileMotionSimulation implements Simulation {
 
     const rightArrow = document.createElement('span');
     rightArrow.textContent = '▶';
-    rightArrow.style.cssText = 'font-size: 12px; color: rgba(255,255,255,0.3);';
+    rightArrow.dataset['arrow'] = 'right';
+    rightArrow.style.cssText = `
+      font-size: 18px; color: rgba(100, 181, 246, 0.7);
+      padding: 6px 10px; border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    `;
+    rightArrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._focusedControl = index;
+      this._updateFocus();
+      this._adjustParam(1);
+    });
 
     valueArea.appendChild(leftArrow);
     valueArea.appendChild(valueEl);
@@ -682,18 +803,32 @@ export class ProjectileMotionSimulation implements Simulation {
     const tof = computeTimeOfFlight(params);
     const range = computeRange(params);
     const maxH = computeMaxHeight(params);
+    const v0x = params.initialSpeed * Math.cos(params.launchAngle);
+    const v0y = params.initialSpeed * Math.sin(params.launchAngle);
+
+    const isPreLaunch = this._clock.elapsed === 0 && !this._currentState.landed;
+    const isLanded = this._currentState.landed;
+
+    const currentSpeed = isPreLaunch || isLanded ? 0 : this._currentState.velocity.magnitude();
+    const currentVx = isPreLaunch || isLanded ? 0 : this._currentState.velocity.x;
+    const currentVy = isPreLaunch || isLanded ? 0 : this._currentState.velocity.y;
 
     const measurements = [
-      { label: 'Time', value: `${this._clock.elapsed.toFixed(2)} s` },
-      { label: 'Position', value: `(${this._currentState.position.x.toFixed(1)}, ${this._currentState.position.y.toFixed(1)}) m` },
-      { label: 'Velocity', value: `${this._currentState.velocity.magnitude().toFixed(1)} m/s` },
-      { label: 'vₓ', value: `${this._currentState.velocity.x.toFixed(1)} m/s` },
-      { label: 'vᵧ', value: `${this._currentState.velocity.y.toFixed(1)} m/s` },
+      { label: 'Time (t)', value: `${this._clock.elapsed.toFixed(2)} s` },
+      { label: 'Position (x, y)', value: `(${this._currentState.position.x.toFixed(1)}, ${this._currentState.position.y.toFixed(1)}) m` },
+      { label: '─', value: '' },
+      { label: 'Current Speed (v)', value: `${currentSpeed.toFixed(1)} m/s` },
+      { label: 'Current vₓ', value: `${currentVx.toFixed(1)} m/s` },
+      { label: 'Current vᵧ', value: `${currentVy.toFixed(1)} m/s` },
+      { label: '─', value: '' },
+      { label: 'Initial Speed (v₀)', value: `${params.initialSpeed.toFixed(1)} m/s` },
+      { label: 'Initial v₀ₓ', value: `${v0x.toFixed(1)} m/s` },
+      { label: 'Initial v₀ᵧ', value: `${v0y.toFixed(1)} m/s` },
+      { label: 'Launch Angle (θ)', value: `${radToDeg(params.launchAngle).toFixed(0)}°` },
       { label: '─', value: '' },
       { label: 'Range (R)', value: `${range.toFixed(2)} m` },
       { label: 'Max Height (H)', value: `${maxH.toFixed(2)} m` },
-      { label: 'Time of Flight', value: `${tof.toFixed(2)} s` },
-      { label: 'Launch Angle', value: `${radToDeg(params.launchAngle).toFixed(0)}°` },
+      { label: 'Time of Flight (T)', value: `${tof.toFixed(2)} s` },
     ];
 
     this._measurePanel.innerHTML = '';

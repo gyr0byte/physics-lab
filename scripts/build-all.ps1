@@ -1,5 +1,5 @@
 # build-all.ps1
-# Full build pipeline: web → copy assets → Android APK
+# Full build pipeline: web -> copy assets -> Android APK
 #
 # Usage: .\scripts\build-all.ps1
 # Run from the repository root (D:\Public High school)
@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-Write-Host "=== Physics Lab — Full Build ===" -ForegroundColor Cyan
+Write-Host "=== Physics Lab -- Full Build ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Step 1: Build simulation-web
@@ -44,30 +44,33 @@ Write-Host ""
 # Step 3: Copy web assets to Android
 Write-Host "Step 3: Copying web assets to Android..." -ForegroundColor Yellow
 & (Join-Path (Join-Path $repoRoot "scripts") "copy-web-assets.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Asset copy failed" }
 Write-Host ""
 
 # Step 4: Build Android APK
 Write-Host "Step 4: Building Android APK..." -ForegroundColor Yellow
 $androidDir = Join-Path $repoRoot "android"
 
+# Default GRADLE_USER_HOME to D:\Gradle to protect C: drive
+if (-not $env:GRADLE_USER_HOME) {
+    $env:GRADLE_USER_HOME = "D:\Gradle"
+    Write-Host "  Using default GRADLE_USER_HOME: D:\Gradle" -ForegroundColor Gray
+}
+
 # Check prerequisites
 if (-not $env:JAVA_HOME) {
-    Write-Warning "JAVA_HOME not set. Set it to JDK 17 (e.g., D:\jdk-17)"
+    Write-Warning 'JAVA_HOME not set. Set it to JDK 17 (e.g., D:\jdk-17)'
 }
 if (-not $env:ANDROID_HOME -and -not $env:ANDROID_SDK_ROOT) {
-    Write-Warning "ANDROID_HOME not set. Set it to Android SDK (e.g., D:\Android\Sdk)"
-}
-if (-not $env:GRADLE_USER_HOME) {
-    Write-Warning "GRADLE_USER_HOME not set. Consider setting to D:\Gradle to keep caches on D:"
+    Write-Warning 'ANDROID_HOME not set. Set it to Android SDK (e.g., D:\Android\Sdk)'
 }
 
 Push-Location $androidDir
 try {
     if (Test-Path "gradlew.bat") {
-        .\gradlew.bat assembleDebug
+        .\gradlew.bat assembleDebug --no-daemon
     } else {
-        Write-Warning "Gradle wrapper not found. Run 'gradle wrapper' in android/ first."
-        Write-Warning "Or download gradlew from: https://services.gradle.org/distributions/"
+        Write-Warning 'Gradle wrapper not found.'
         exit 1
     }
     if ($LASTEXITCODE -ne 0) { throw "Android build failed" }

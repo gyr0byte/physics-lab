@@ -2,10 +2,8 @@ import { ProjectileMotionSimulation } from './simulations/projectile-motion/Proj
 
 /**
  * Entry point for the simulation web application.
- * For now, directly launches the Projectile Motion simulation.
- * Future: simulation routing based on URL hash or message from Android host.
+ * Launches the Projectile Motion simulation.
  */
-
 function main(): void {
   const container = document.getElementById('app');
   if (!container) {
@@ -15,7 +13,6 @@ function main(): void {
   const simulation = new ProjectileMotionSimulation();
   simulation.initialize(container);
 
-  // Expose for debugging
   if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>)['__simulation'] = simulation;
   }

@@ -2,10 +2,13 @@ package com.physicslab.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -14,8 +17,8 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.*
 
 /**
- * Home screen: Physics Lab landing page for Android TV.
- * Shows grade selection: Grade 11 and Grade 12.
+ * Home screen: Physics Lab landing page.
+ * Works on both Android TV (D-pad focus) and phones (touch).
  */
 @Composable
 fun HomeScreen(
@@ -80,7 +83,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = "Use ← → to navigate  •  Press Select to choose",
+                text = "Tap a grade to begin  •  Use D-pad on TV remote",
                 fontSize = 14.sp,
                 color = Color(0xFF484F58)
             )
@@ -98,7 +101,10 @@ private fun GradeCard(
         onClick = onClick,
         modifier = Modifier
             .width(280.dp)
-            .height(180.dp),
+            .height(180.dp)
+            // .clickable makes the card respond to touch taps on phones
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
         colors = CardDefaults.colors(
             containerColor = Color(0xFF161B22),
             focusedContainerColor = Color(0xFF1C2433)
@@ -131,3 +137,4 @@ private fun GradeCard(
         }
     }
 }
+

@@ -2,10 +2,13 @@ package com.physicslab.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
@@ -102,7 +105,10 @@ private fun AreaCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(120.dp),
+        modifier = modifier
+            .height(120.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
         colors = CardDefaults.colors(
             containerColor = Color(0xFF161B22),
             focusedContainerColor = Color(0xFF1C2433)

@@ -100,7 +100,7 @@ export class Graph {
 
     // Axis labels
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '11px "Inter", sans-serif';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(this._xLabel, margin.left + plotW / 2, h - 4);
     ctx.save();
@@ -152,7 +152,7 @@ export class Graph {
     // Legend
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = '11px "Inter", sans-serif';
+    ctx.font = '11px system-ui, -apple-system, sans-serif';
     let lx = margin.left + 8;
     for (const s of this._series) {
       ctx.fillStyle = s.color;

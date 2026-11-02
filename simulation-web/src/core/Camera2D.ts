@@ -49,9 +49,9 @@ export class Camera2D {
    * @param marginPx    pixel margin around the viewport
    */
   fitWorld(worldWidth: number, worldHeight: number, marginPx: number = 80): void {
-    const availW = this._canvasWidth - 2 * marginPx;
-    const availH = this._canvasHeight - 2 * marginPx;
-    this._scale = Math.min(availW / worldWidth, availH / worldHeight);
+    const availW = Math.max(1, this._canvasWidth - 2 * marginPx);
+    const availH = Math.max(1, this._canvasHeight - 2 * marginPx);
+    this._scale = Math.min(availW / Math.max(0.001, worldWidth), availH / Math.max(0.001, worldHeight));
     this._originX = marginPx;
     this._originY = this._canvasHeight - marginPx;
   }

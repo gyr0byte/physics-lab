@@ -7,12 +7,12 @@
       No internet required. No touchscreen required.
     -->
 
-    <!-- TV requires the leanback feature -->
+    <!-- TV: leanback is optional so the app also runs on phones/tablets -->
     <uses-feature
         android:name="android.software.leanback"
-        android:required="true" />
+        android:required="false" />
 
-    <!-- Declare that touchscreen is NOT required (TV) -->
+    <!-- Declare that touchscreen is NOT required (TV remotes) -->
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
@@ -30,7 +30,13 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:screenOrientation="landscape">
 
-            <!-- Standard launcher intent for TV -->
+            <!-- Standard launcher (phones, tablets) -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- TV launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
