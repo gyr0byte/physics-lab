@@ -76,4 +76,25 @@ describe('Camera2D', () => {
     const origin = cam.worldToScreen(new Vector2(0, 0));
     expect(origin.y).toBe(1080 - 60);
   });
+
+  it('setScale updates scale and clamps to positive minimum', () => {
+    const cam = new Camera2D(800, 600);
+    cam.setScale(25);
+    expect(cam.scale).toBe(25);
+
+    cam.setScale(-5);
+    expect(cam.scale).toBe(0.001);
+  });
+
+  it('setOrigin updates origin position for panning and tracking', () => {
+    const cam = new Camera2D(800, 600);
+    cam.setScale(10);
+    cam.setOrigin(300, 400);
+
+    const pt = cam.worldToScreen(new Vector2(5, 2));
+    // screenX = 300 + 5 * 10 = 350
+    // screenY = 400 - 2 * 10 = 380
+    expect(pt.x).toBe(350);
+    expect(pt.y).toBe(380);
+  });
 });

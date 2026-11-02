@@ -53,9 +53,10 @@ Minimal set of abstractions used by all simulations:
 
 - `Vector2` — 2D vector math (position, velocity, acceleration)
 - `SimulationClock` — Fixed-timestep time management with pause/resume/reset
-- `Camera2D` — World coordinates (meters) ↔ screen coordinates (pixels)
+- `Camera2D` — World coordinates (meters) ↔ screen coordinates (pixels) with origin tracking
 - `InputManager` — D-pad/keyboard input abstraction
 - `Simulation` — Lifecycle interface: initialize, start, pause, reset, tick, dispose
+- `SimulationRegistry` — Central registry mapping simulation IDs to metadata and factory functions
 
 ### Physics Layer
 
@@ -66,16 +67,46 @@ Pure mathematical models, separated from rendering:
   - `computeRange(params)` — horizontal range
   - `computeMaxHeight(params)` — maximum height
   - `computeTimeOfFlight(params)` — total flight time
+- `NewtonsSecondLawPhysics.ts` — Force equilibrium and dynamics equations
+  - `computeForcesAndAcceleration(params, currentVelocity)` — normal, weight, static/kinetic friction, net force, acceleration
+  - `stepNewtonsSecondLaw(currentState, params, dt)` — semi-implicit Euler step with zero-crossing friction arrest
+  - `createInitialNewtonsSecondLawState(params)` — initial static state
 
 ### Rendering Layer
 
 Canvas drawing helpers:
 
 - Grid and axes
-- Vector arrows (velocity, acceleration)
+- Vector arrows (velocity, acceleration, applied force, friction, net force)
 - Trajectory paths
 - Circles (projectile)
 - Ground with hatching
+- Horizontal distance track with major/minor graduations
+- Sliding crate with mass label
+
+### Simulation Registry & Dynamic URL Hash Routing
+
+The web application supports multiple simulations through a decoupled registry pattern:
+
+```
+Android NavGraph / SimulationScreen.kt
+              │
+              │  loadUrl("https://appassets.androidplatform.net/assets/simulation-web/index.html#newtons-second-law")
+              ▼
+WebView (Virtual HTTPS domain)
+              │
+              │  window.location.hash
+              ▼
+main.ts (hashchange listener)
+  1. Cleanly dispose active simulation (listeners, clocks, canvas)
+  2. Resolve simulation factory from SimulationRegistry
+  3. Instantiate and initialize target simulation
+```
+
+This ensures:
+- Adding new simulations requires zero modifications to navigation routing or WebView shell configuration.
+- Navigating between simulations inside WebView tears down previous animation frames, preventing memory leaks.
+- Desktop browser development directly supports bookmarkable/shareable URLs (e.g. `http://localhost:5173/#projectile-motion` vs `http://localhost:5173/#newtons-second-law`).
 
 ### Data Flow
 

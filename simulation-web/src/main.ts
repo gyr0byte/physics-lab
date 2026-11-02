@@ -1,21 +1,65 @@
+import { simulationRegistry } from './core/SimulationRegistry';
 import { ProjectileMotionSimulation } from './simulations/projectile-motion/ProjectileMotionSimulation';
+import { NewtonsSecondLawSimulation } from './simulations/newtons-second-law/NewtonsSecondLawSimulation';
+import type { Simulation } from './core/Simulation';
+
+// Register all educational physics simulations
+simulationRegistry.register({
+  metadata: new ProjectileMotionSimulation().metadata,
+  create: () => new ProjectileMotionSimulation(),
+});
+
+simulationRegistry.register({
+  metadata: new NewtonsSecondLawSimulation().metadata,
+  create: () => new NewtonsSecondLawSimulation(),
+});
+
+let activeSimulation: Simulation | null = null;
 
 /**
- * Entry point for the simulation web application.
- * Launches the Projectile Motion simulation.
+ * Resolve and launch the simulation requested by URL hash.
+ * Defaults to 'projectile-motion' if no hash or invalid hash is provided.
  */
-function main(): void {
+function loadSimulationFromHash(): void {
   const container = document.getElementById('app');
   if (!container) {
     throw new Error('Missing #app container element');
   }
 
-  const simulation = new ProjectileMotionSimulation();
-  simulation.initialize(container);
+  const rawHash = window.location.hash.replace(/^#/, '').trim();
+  const simId = rawHash || 'projectile-motion';
 
-  if (import.meta.env.DEV) {
-    (window as unknown as Record<string, unknown>)['__simulation'] = simulation;
+  // If a simulation is already running, cleanly dispose it
+  if (activeSimulation) {
+    try {
+      activeSimulation.dispose();
+    } catch (err) {
+      console.warn('Error disposing previous simulation:', err);
+    }
+    activeSimulation = null;
   }
+
+  // Look up simulation in registry
+  let entry = simulationRegistry.get(simId);
+  if (!entry) {
+    console.warn(`Simulation ID "${simId}" not found in registry. Defaulting to projectile-motion.`);
+    entry = simulationRegistry.get('projectile-motion');
+  }
+
+  if (entry) {
+    activeSimulation = entry.create();
+    activeSimulation.initialize(container);
+
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>)['__simulation'] = activeSimulation;
+      (window as unknown as Record<string, unknown>)['__simulationRegistry'] = simulationRegistry;
+    }
+  }
+}
+
+function main(): void {
+  loadSimulationFromHash();
+  window.addEventListener('hashchange', loadSimulationFromHash);
 }
 
 // Start when DOM is ready

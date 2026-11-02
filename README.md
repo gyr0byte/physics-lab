@@ -8,11 +8,12 @@ Interactive physics simulations for Grade 11 and Grade 12 students, following th
 
 | Component | Status |
 |-----------|--------|
-| Simulation engine (TypeScript) | ✅ Working |
+| Simulation engine (TypeScript) | ✅ Working (SimulationRegistry, Vector2, SimulationClock, Camera2D, CanvasRenderer) |
 | Projectile Motion simulation | ✅ Working (offline font stack, relative asset paths, idempotent loop, 90° robust sampling) |
-| Core & Physics unit tests | ✅ 61 tests passing (Vector2, SimulationClock, Camera2D, ProjectilePhysics) |
-| Web build (Vite + TS) | ✅ Builds with relative paths (`./assets/...`) (25 KB bundle) |
-| Desktop browser development | ✅ Working |
+| Newton's Second Law simulation | ✅ Working (F_net = m*a, static/kinetic friction, dynamic camera, live verification) |
+| Core & Physics unit tests | ✅ 78 tests passing across 6 suites (Vector2, Clock, Camera2D, Registry, Projectile, Newton) |
+| Web build (Vite + TS) | ✅ Builds with relative paths (`./assets/...`) (46 KB bundle) |
+| Desktop browser development | ✅ Working with URL hash routing (`#projectile-motion`, `#newtons-second-law`) |
 | Android shell (Kotlin/Compose) | ✅ Code complete (security hardened, dual D-pad/touch support, lifecycle managed) |
 | WebView integration | ✅ Code complete with `WebViewAssetLoader`, CORS headers, and MIME mappings |
 | Gradle wrapper | ✅ Verified with Gradle 9.6.1 + AGP 9.4.0 |
@@ -144,20 +145,30 @@ D:\Public High school\
 │   │   │   ├── SimulationClock.ts
 │   │   │   ├── Camera2D.ts
 │   │   │   ├── InputManager.ts
-│   │   │   └── Simulation.ts
+│   │   │   ├── Simulation.ts
+│   │   │   └── SimulationRegistry.ts
 │   │   ├── physics/            # Pure math models
-│   │   │   └── ProjectilePhysics.ts
+│   │   │   ├── ProjectilePhysics.ts
+│   │   │   └── NewtonsSecondLawPhysics.ts
 │   │   ├── rendering/          # Canvas drawing
 │   │   │   └── CanvasRenderer.ts
 │   │   ├── components/         # UI components
 │   │   │   └── Graph.ts
 │   │   ├── simulations/        # Individual simulations
-│   │   │   └── projectile-motion/
-│   │   │       └── ProjectileMotionSimulation.ts
+│   │   │   ├── projectile-motion/
+│   │   │   │   └── ProjectileMotionSimulation.ts
+│   │   │   └── newtons-second-law/
+│   │   │       └── NewtonsSecondLawSimulation.ts
 │   │   └── main.ts
 │   ├── tests/
-│   │   ├── core/vector2.test.ts
-│   │   └── physics/projectile.test.ts
+│   │   ├── core/
+│   │   │   ├── vector2.test.ts
+│   │   │   ├── clock.test.ts
+│   │   │   ├── camera2d.test.ts
+│   │   │   └── registry.test.ts
+│   │   └── physics/
+│   │       ├── projectile.test.ts
+│   │       └── newton.test.ts
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── index.html
@@ -165,8 +176,11 @@ D:\Public High school\
 ├── docs/
 │   ├── architecture.md
 │   ├── curriculum-map.md
-│   └── simulation-specs/
-│       └── projectile-motion.md
+│   ├── simulation-specs/
+│   │   ├── projectile-motion.md
+│   │   └── newtons-second-law.md
+│   └── testing/
+│       └── first-vertical-slice.md
 │
 ├── scripts/
 │   ├── copy-web-assets.ps1

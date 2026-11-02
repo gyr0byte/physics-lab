@@ -42,6 +42,15 @@ export class Camera2D {
     this._originY = canvasHeight - 60;
   }
 
+  setScale(scale: number): void {
+    this._scale = Math.max(0.001, scale);
+  }
+
+  setOrigin(originX: number, originY: number): void {
+    this._originX = originX;
+    this._originY = originY;
+  }
+
   /**
    * Configure the camera view to fit a given world rectangle.
    * @param worldWidth  width in meters to display

@@ -229,3 +229,105 @@ export function drawGround(
   }
   ctx.restore();
 }
+
+/** Draw a horizontal track with distance tick marks */
+export function drawTrack(
+  ctx: CanvasRenderingContext2D,
+  camera: Camera2D,
+  xMin: number,
+  xMax: number,
+  step: number = 5
+): void {
+  const p1 = camera.worldToScreen(new Vector2(xMin, 0));
+  const p2 = camera.worldToScreen(new Vector2(xMax, 0));
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.stroke();
+
+  // Tick marks and distance labels
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.font = '12px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  for (let x = Math.ceil(xMin / step) * step; x <= xMax; x += step) {
+    const tickScreen = camera.worldToScreen(new Vector2(x, 0));
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tickScreen.x, tickScreen.y);
+    ctx.lineTo(tickScreen.x, tickScreen.y + 8);
+    ctx.stroke();
+
+    ctx.fillText(`${x} m`, tickScreen.x, tickScreen.y + 12);
+  }
+
+  ctx.restore();
+}
+
+/** Draw a mass block resting on a surface */
+export function drawBlock(
+  ctx: CanvasRenderingContext2D,
+  camera: Camera2D,
+  bottomCenterWorld: Vector2,
+  widthWorld: number,
+  heightWorld: number,
+  options: {
+    fillColor?: string;
+    strokeColor?: string;
+    label?: string;
+    labelColor?: string;
+  } = {}
+): void {
+  const {
+    fillColor = '#2196F3',
+    strokeColor = '#64B5F6',
+    label = '',
+    labelColor = '#ffffff',
+  } = options;
+
+  const bc = camera.worldToScreen(bottomCenterWorld);
+  const wPx = Math.max(10, widthWorld * camera.scale);
+  const hPx = Math.max(10, heightWorld * camera.scale);
+
+  const left = bc.x - wPx / 2;
+  const top = bc.y - hPx;
+
+  ctx.save();
+
+  // Block body
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(left, top, wPx, hPx);
+
+  // Border
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(left, top, wPx, hPx);
+
+  // Surface texture / diagonal cross pattern for crate aesthetic
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left + wPx, top + hPx);
+  ctx.moveTo(left + wPx, top);
+  ctx.lineTo(left, top + hPx);
+  ctx.stroke();
+
+  // Mass label in the center
+  if (label) {
+    ctx.fillStyle = labelColor;
+    ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bc.x, top + hPx / 2);
+  }
+
+  ctx.restore();
+}
+

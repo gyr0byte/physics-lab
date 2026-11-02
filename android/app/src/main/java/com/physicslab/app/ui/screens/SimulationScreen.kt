@@ -185,8 +185,9 @@ fun SimulationScreen(
                         }
                     }
 
-                    // Load the bundled simulation
-                    loadUrl("https://appassets.androidplatform.net/assets/simulation-web/index.html")
+                    // Load the bundled simulation with the targeted simulation ID hash
+                    val simHash = if (simulationId.isNotBlank()) "#$simulationId" else ""
+                    loadUrl("https://appassets.androidplatform.net/assets/simulation-web/index.html$simHash")
                 }
             },
             onRelease = { webView ->

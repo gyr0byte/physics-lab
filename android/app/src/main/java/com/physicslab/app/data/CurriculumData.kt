@@ -40,7 +40,7 @@ object CurriculumData {
     // ── Grade 11 ─────────────────────────────────────────────────
 
     private val grade11Areas = listOf(
-        CurriculumArea("Mechanics", topicCount = 5, simulationCount = 1),
+        CurriculumArea("Mechanics", topicCount = 5, simulationCount = 2),
         CurriculumArea("Heat and Thermodynamics", topicCount = 3, simulationCount = 0),
         CurriculumArea("Waves and Optics", topicCount = 3, simulationCount = 0),
         CurriculumArea("Electricity and Magnetism", topicCount = 3, simulationCount = 0),
@@ -62,7 +62,7 @@ object CurriculumData {
     private val topicsByArea = mapOf(
         "11:Mechanics" to listOf(
             CurriculumTopic("Kinematics — Projectile Motion", listOf("projectile-motion")),
-            CurriculumTopic("Newton's Laws of Motion", emptyList()),
+            CurriculumTopic("Newton's Laws of Motion", listOf("newtons-second-law")),
             CurriculumTopic("Friction", emptyList()),
             CurriculumTopic("Work, Energy and Power", emptyList()),
             CurriculumTopic("Circular Motion", emptyList()),
