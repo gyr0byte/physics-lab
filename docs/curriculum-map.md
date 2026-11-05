@@ -5,6 +5,9 @@
 **Target Level:** Secondary Level (Grades 11 and 12 Science — NEB)  
 **Total Chapters:** **51 Official Chapters** (Grade 11: 26 Chapters; Grade 12: 25 Chapters) across 5 Content Areas.
 
+> [!IMPORTANT]
+> **Developer Reference Notice:** The curriculum documentation in `docs/curriculum/` serves strictly as an **internal engineering and pedagogical development reference** to ensure academic accuracy and systematic mapping of simulations to official Nepal CDC chapters. Physics Lab is an interactive physics simulation application (PhET-style), **not** a digital textbook or learning management system. Application runtime metadata is kept minimal (Grade, Chapter Number, Title, Content Area, Simulation IDs, and Status), prioritizing interactive experimentation over written theory.
+
 ---
 
 ## 1. Official Curriculum Reference Documentation

@@ -1,6 +1,31 @@
 # Physics Lab
 
-Interactive physics simulations for Grade 11 and Grade 12 students, following the Nepal secondary-level Physics curriculum. Designed for Android TV in a classroom setting.
+Interactive physics simulations for Grade 11 and Grade 12 students, following the Nepal secondary-level Physics curriculum. Designed for Android TV in a classroom setting at Shree Public High School, Dharan-12, Sunsari, Nepal.
+
+## Product Vision & Scope
+
+**Physics Lab is an interactive physics simulation application**, inspired by the active learning approach of PhET Interactive Simulations.
+
+The central student experience is **experimentation and visualization**:
+- Adjust physical parameters (e.g., launch angle, force, mass, wire length, frequency).
+- Observe dynamic physical responses and trajectories in real time.
+- Inspect vectors, measurements, and live graphs.
+- Operate with intuitive Start, Pause, and Reset controls.
+- Navigate seamlessly with an Android TV remote / D-pad in an offline classroom.
+
+### Explicit Scope Boundaries (What We Are NOT Building)
+To maintain focus on high-quality interactive physics simulations, the following are strictly out of scope:
+- **No full textbook chapters or written digital notes.**
+- **No theoretical essay lessons or textbook reproduction.**
+- **No Learning Management System (LMS) functionality.**
+- **No student user accounts, authentication, or cloud database.**
+- **No question banks, quizzes, assignments, or grading engines.**
+- **No AI tutoring or backend microservices.**
+
+### Role of Curriculum Documentation
+Official Nepal CDC curriculum specifications (`docs/curriculum/`) serve strictly as an **internal engineering and development reference** to identify chapters, verify academic accuracy, and map simulation opportunities. The application runtime maintains only concise chapter metadata (grade, chapter number, official title, content area, simulation IDs, and status) sufficient for navigation and launching simulations.
+
+---
 
 ## Status
 

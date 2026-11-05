@@ -1,5 +1,13 @@
 # Architecture
 
+## Product Scope & Design Philosophy
+
+Physics Lab is an **interactive physics simulation application**, inspired by PhET Interactive Simulations, specifically engineered for offline classroom Android TV displays at Shree Public High School, Dharan-12, Sunsari, Nepal.
+
+- **Primary Goal:** Hands-on parameter manipulation, live physics calculations, real-time Canvas visualization, vector displays, and measurements.
+- **Explicit Non-Goals:** Physics Lab is **not** an online textbook, learning management system, notes platform, or assessment engine. It contains no student login, cloud sync, grading, essay lessons, or digital textbook reproductions.
+- **Curriculum Role:** Nepal CDC curriculum documents in `docs/curriculum/` serve as an internal developer reference for mapping simulation opportunities and ensuring mathematical/academic accuracy. Application runtime data stores only concise chapter metadata for navigation and simulation launching.
+
 ## Overview
 
 Physics Lab uses a two-layer architecture:
