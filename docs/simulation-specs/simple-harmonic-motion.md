@@ -29,20 +29,24 @@ This simulation directly addresses the learning competencies defined in **Nepal 
 
 ---
 
-## 2. Educational Modes Structure
+## 2. Educational Modes Structure & Physical Apparatus Allocation
 
-To provide comprehensive curriculum coverage without cluttering the screen or overwhelming classroom TV remote interaction, the simulation is structured into **four dedicated educational modes**:
+To provide comprehensive curriculum coverage while maintaining strict physical apparatus realism without artificial collision artifacts, the simulation allocates appropriate physical apparatus to each educational mode:
 
 ```
 Mode Selector (D-pad accessible tabs)
 ├── 1. Free Oscillation (Ideal SHM)
-│    ├── System A: Vertical Spring-Mass (Primary CDC Model)
+│    ├── System A: Vertical Spring-Mass (Primary CDC Model; Axially Guided, L_solid = 0.10 m)
 │    ├── System B: Simple Pendulum (Small-Angle vs. Nonlinear Comparison)
-│    └── System C: Horizontal Spring-Mass (Optional Comparison)
-├── 2. Damped Oscillation (Viscous resistance, exponential envelope, energy dissipation)
-├── 3. Forced Oscillation (External periodic driver, transient vs. steady-state)
-└── 4. Mechanical Resonance (Frequency response curve A(Ω), resonance peak, Q-factor)
+│    └── System C: Horizontal Guided Spring-Mass (Air Track Comparison)
+├── 2. Damped Oscillation (Viscous resistance, exponential envelope, energy dissipation; Vertical or Horizontal Apparatus)
+├── 3. Forced Oscillation (Horizontal Guided Air Track; external periodic driver along track axis avoids ceiling collisions)
+└── 4. Mechanical Resonance (Horizontal Guided Air Track; full ~2.0 m resonance response without ceiling obstruction)
 ```
+
+> **Physical Apparatus Realism Rationale:**
+> In forced oscillation near resonance ($m=1\text{ kg}, k=25\text{ N/m}, b=0.20\text{ N}\cdot\text{s/m}, F_0=2\text{ N}$), the theoretical displacement amplitude surges to $A_{\max} \approx 2.0\text{ m}$. For a vertical spring suspended under a ceiling with equilibrium length $y_{\text{eq}} \approx 0.79\text{ m}$, an upward oscillation of $2.0\text{ m}$ would pass over $1.2\text{ m}$ through the ceiling mount!
+> To eliminate this physical contradiction, **Forced Oscillation and Mechanical Resonance employ a horizontal guided air track system** anchored to a vertical wall. The external driver acts horizontally along the track axis, where generous linear travel ($\pm 2.5\text{ m}$) accommodates the full resonance surge naturally. Free and damped oscillations use the vertical spring apparatus where travel constraints ($y_{\text{phys}} \ge L_{\text{solid}}$) are fully satisfied.
 
 ---
 
@@ -318,11 +322,13 @@ Resonance occurs when the external driver frequency approaches the system's natu
 
 ### 4.1 Physical Assumptions of the Simulation Models
 To maintain scientific transparency and educational clarity, the mathematical models are based on explicit physical assumptions:
-1. **Ideal Hookean Spring:** The helical spring is assumed massless, with uniform linear elasticity governed strictly by Hooke's Law ($F_s = -k \Delta l$) throughout its operational displacement. Spring mass inertia and internal coil collisions are neglected.
-2. **Positive Extension Regime:** The spring operates in tension. The initial amplitude is validated such that $A < L_0 + \Delta l$, ensuring the mass never strikes the rigid ceiling mount or collapses into solid height.
+1. **Ideal Hookean Spring:** The helical spring is assumed massless, with uniform linear elasticity governed strictly by Hooke's Law ($F_s = -k \Delta l_{\text{spring}}$) throughout its operational displacement. Spring mass inertia and internal coil friction are neglected.
+2. **Axially Guided Spring (Extension & Compression with Solid-Height Bound):** The spring is mounted on a coaxial linear guide, allowing it to operate symmetrically in both extension ($x > -\Delta l$) and compression ($x < -\Delta l$). The spring has a defined minimum compressed length (solid height) $L_{\text{solid}} = 0.10\text{ m}$ below which coils contact each other and cannot be further compressed.
+   - For vertical apparatus: physical travel is bounded by $y_{\text{phys}} \ge L_{\text{solid}} = 0.10\text{ m} \iff x \ge -(L_0 + \Delta l - L_{\text{solid}})$.
+   - For horizontal apparatus: travel in compression is bounded by $x \ge -(L_0 - L_{\text{solid}})$, while extension along the guide track accommodates large resonance excursions without ceiling obstruction.
 3. **Linear Viscous Damping:** Drag is modeled as laminar fluid/air resistance directly proportional to velocity ($F_d = -b v$). Quadratic turbulent drag ($\propto v^2$) is excluded to preserve linear differential equation solvability aligned with Nepal CDC Grade 12 Subtopic 2.9.
 4. **Ideal Simple Pendulum:** The suspension cord is assumed perfectly inextensible and massless, swinging from a frictionless point pivot in a uniform gravitational field. The bob is treated as a point mass.
-5. **Pure Coaxial External Forcing:** In forced oscillation, the external driving force acts strictly along the vertical axis of the spring without introducing lateral pendular rocking, twisting, or transverse resonant modes.
+5. **Horizontal Forcing Alignment:** In forced oscillation and mechanical resonance modes, the external periodic driving actuator acts strictly along the horizontal axis of the linear air track, eliminating vertical ceiling collisions and lateral transverse modes.
 
 ---
 
@@ -334,7 +340,8 @@ All user-adjustable controls enforce strict validation boundaries:
 |---|:---:|:---:|:---:|:---:|:---:|---|
 | **Mass** | $m$ | kg | 1.00 | 0.20 to 3.00 | 0.10 | Must be strictly positive ($m > 0$). Capped at $3.0\text{ kg}$ to prevent excessive elongation. |
 | **Spring Constant** | $k$ | N/m | 25.0 | 10.0 to 100.0 | 5.0 | Must be strictly positive ($k > 0$). $25\text{ N/m}$ gives clean, countable period ($T \approx 1.26\text{ s}$). |
-| **Initial Amplitude** | $A$ | m | 0.30 | 0.05 to 0.50 | 0.05 | Validated against ceiling clearance: requires $A < 0.85(L_0 + \Delta l)$. |
+| **Initial Amplitude (Vertical)** | $A$ | m | 0.30 | 0.05 to 0.50 | 0.05 | Validated against solid height: requires $A \le 0.85(L_0 + \Delta l - L_{\text{solid}})$. |
+| **Initial Amplitude (Horizontal)** | $A$ | m | 0.30 | 0.05 to 2.50 | 0.05 | Validated against track length: accommodates large forced resonance excursions. |
 | **Damping Coeff** | $b$ | $\text{N}\cdot\text{s/m}$ | 0.00 | 0.00 to 1.00 | 0.05 | $b \ge 0$. Across full ranges ($m \ge 0.2\text{ kg}, k \ge 10\text{ N/m}, b \le 1.0\text{ N}\cdot\text{s/m}$), $\zeta_{\max} = \frac{1.0}{2\sqrt{10 \times 0.2}} = \frac{1}{2\sqrt{2}} \approx 0.3536 < 0.7071$. Strictly underdamped. |
 | **Pendulum Length** | $L$ | m | 1.00 | 0.30 to 2.50 | 0.10 | Must be strictly positive ($L > 0$). $L = 1.00\text{ m}$ gives standard "seconds pendulum" ($T \approx 2.0\text{ s}$). |
 | **Pendulum Angle** | $\theta_0$ | deg | $12^\circ$ | $2^\circ$ to $30^\circ$ | $1^\circ$ | Default $12^\circ$ stays in small-angle regime ($0.27\%$ error). $30^\circ$ enables nonlinear comparison. |
@@ -342,13 +349,13 @@ All user-adjustable controls enforce strict validation boundaries:
 | **Driving Freq** | $\Omega$ | rad/s | 4.00 | 0.00 to 15.00 | 0.20 | Allows static load ($\Omega = 0 \implies A = F_0/k$) and sweeps across resonance $\omega_0 = 5.00\text{ rad/s}$. |
 | **Driver Force** | $F_0$ | N | 2.00 | 0.50 to 5.00 | 0.50 | Sufficient force to demonstrate steady-state resonance without visual off-screen excursion. |
 
-**Default Forced Oscillation Preset:**
+**Default Forced Oscillation Preset (Horizontal Air Track):**
 - Default demonstration configuration: $m = 1.0\text{ kg}, k = 25.0\text{ N/m}, b = 0.20\text{ N}\cdot\text{s/m}, F_0 = 2.0\text{ N}, \Omega = 4.0\text{ rad/s}$ ($\omega_0 = 5.0\text{ rad/s}$).
-- Using finite damping ($b = 0.20\text{ N}\cdot\text{s/m}$) guarantees a finite, realistic initial steady-state amplitude ($A \approx 0.22\text{ m}$).
+- Operates on a horizontal low-friction guide rail anchored to a vertical wall, allowing clean horizontal oscillation across the full amplitude range ($A \approx 0.22\text{ m}$ off-resonance, $A_{\max} \approx 2.0\text{ m}$ at resonance) without ceiling obstruction.
 - Undamped resonance ($b = 0, \Omega = \omega_0$) is maintained as a separate, intentional preset/experiment with an explicit visual warning of unbounded theoretical amplitude ($A \to \infty$).
 
 **Explicit Physical Parameter Validation:**
-- The relationship $\Delta l = \frac{mg}{k}$ is strictly preserved.
+- The relationship $\Delta l = \frac{mg}{k}$ is strictly preserved for vertical configurations.
 - If an invalid combination yields $\Delta l > 1.80\text{ m}$ (e.g. $m=3.0\text{ kg}$ on Jupiter $g=24.79\text{ m/s}^2$ with $k=10\text{ N/m}$, which gives $\Delta l = 7.44\text{ m}$), `validateSpringParams()` rejects the configuration with an explicit validation error: `Static elongation (${deltaL.toFixed(2)} m) exceeds maximum allowable apparatus limit of 1.80 m.`
 - Non-finite numbers (`NaN`, `Infinity`), non-positive masses, non-positive spring constants, negative damping, and out-of-bounds displacements are strictly rejected.
 
@@ -358,7 +365,7 @@ All user-adjustable controls enforce strict validation boundaries:
 
 A critical architectural requirement is distinguishing between the **one-dimensional physical spring coordinates** and the **two-dimensional Camera2D world coordinates**:
 
-#### 1. Physical Coordinate System (1D Vertical, Downward-Positive):
+#### 1. Vertical Apparatus Coordinate System (1D Vertical, Downward-Positive):
 - **Origin ($y=0$):** Rigid ceiling support bracket.
 - **Orientation:** $+y$ points **downward** in the direction of gravity ($\vec{g} = +g \hat{j}_{\text{phys}}$).
 - **Unstretched Spring Position:** $y = L_0$ ($L_0 = 0.40\text{ m}$).
@@ -367,54 +374,58 @@ A critical architectural requirement is distinguishing between the **one-dimensi
 - **Displacement from Static Equilibrium:**
   $$x(t) = y(t) - y_{\text{eq}}$$
   - $x > 0$: Mass is below equilibrium (spring stretched further).
-  - $x < 0$: Mass is above equilibrium (spring partially compressed).
+  - $x < 0$: Mass is above equilibrium (spring compressed toward solid height $L_{\text{solid}} = 0.10\text{ m}$).
 - **Physical Velocity & Acceleration:**
   $$v_{\text{phys}}(t) = \dot{x}(t) \quad (\text{downward-positive})$$
-  $$a_{\text{phys}}(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v_{\text{phys}}(t) + \frac{F_{\text{ext}}(t)}{m}$$
+  $$a_{\text{phys}}(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v_{\text{phys}}(t)$$
 - **Physical Net Restoring Force:**
   $$F_{\text{restore,phys}} = -kx(t) \quad (\text{upward when } x > 0)$$
 
-#### 2. Camera2D World Coordinate System (2D Cartesian, Upward-Positive):
-- **Orientation:** $+Y$ points **upward**, $+X$ points **rightward** (standard Cartesian convention used by `Camera2D.worldToScreen`).
-- **Ceiling Support Anchor World Position:**
-  $$\vec{P}_{\text{ceiling}} = (X_{\text{anchor}}, Y_{\text{ceiling}}) = (0.0\text{ m}, Y_{\text{top}})$$
-- **Equilibrium World Position:**
-  $$\vec{P}_{\text{eq,world}} = (X_{\text{anchor}}, Y_{\text{ceiling}} - y_{\text{eq}}) = (0.0, Y_{\text{ceiling}} - L_0 - \Delta l)$$
-- **Instantaneous Mass Center World Position:**
-  $$\vec{P}_{\text{mass,world}}(t) = (X_{\text{anchor}}, Y_{\text{ceiling}} - y(t)) = (0.0, Y_{\text{eq,world}} - x(t))$$
+#### 2. Horizontal Apparatus Coordinate System (1D Horizontal, Rightward-Positive):
+- **Origin ($X_{\text{wall}} = 0$):** Left-hand vertical wall anchor bracket.
+- **Orientation:** $+X$ points **rightward** along the guide track.
+- **Unstretched Spring Position:** $X = L_0$ ($L_0 = 0.40\text{ m}$).
+- **Equilibrium Coordinate:** $X_{\text{eq}} = X_{\text{wall}} + L_0 = L_0$ (gravity has zero component along track).
+- **Displacement from Equilibrium:**
+  $$x(t) = X(t) - X_{\text{eq}}$$
+  - $x > 0$: Mass is to the right of equilibrium (spring stretched).
+  - $x < 0$: Mass is to the left of equilibrium (spring compressed toward solid height $L_{\text{solid}} = 0.10\text{ m}$).
+- **Physical Velocity & Acceleration:**
+  $$v_{\text{horiz}}(t) = \dot{x}(t) \quad (\text{rightward-positive})$$
+  $$a_{\text{horiz}}(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v_{\text{horiz}}(t) + \frac{F_{\text{ext}}(t)}{m}$$
+- **Physical Net Restoring Force:**
+  $$F_{\text{restore,horiz}} = -kx(t) \quad (\text{leftward when } x > 0)$$
 
-#### 3. Vector Arrow Transformation for Visual Rendering:
-Because world $+Y$ is opposite to physical $+y$, vectors are converted as follows:
-- **Velocity Arrow:** $\vec{V}_{\text{world}} = (0, -v_{\text{phys}}(t))$. (When physical velocity is downward $v_{\text{phys}} > 0$, the canvas arrow points downward in world $-Y$).
-- **Acceleration Arrow:** $\vec{A}_{\text{world}} = (0, -a_{\text{phys}}(t))$.
-- **Restoring Force Arrow:** $\vec{F}_{\text{restore,world}} = (0, +kx(t))$. (When physical displacement is downward $x > 0$, restoring force in world points upward $+Y$).
-- **Driving Force Arrow:** $\vec{F}_{\text{drive,world}} = (0, -F_0 \cos(\Omega t))$.
+#### 3. Camera2D World Coordinate System Transformations:
+- **Vertical Apparatus to World:**
+  $$\vec{P}_{\text{ceiling}} = (0.0\text{ m}, Y_{\text{top}})$$
+  $$\vec{P}_{\text{mass,world}}(t) = (0.0, Y_{\text{ceiling}} - (L_0 + \Delta l + x(t)))$$
+  $$\vec{V}_{\text{world}} = (0, -v_{\text{phys}}(t))$$
+  $$\vec{F}_{\text{restore,world}} = (0, +kx(t))$$
+- **Horizontal Apparatus to World:**
+  $$\vec{P}_{\text{wall}} = (X_{\text{wall}}, Y_{\text{track}})$$
+  $$\vec{P}_{\text{block,world}}(t) = (X_{\text{wall}} + L_0 + x(t), Y_{\text{track}})$$
+  $$\vec{V}_{\text{world}} = (v(t), 0)$$
+  $$\vec{A}_{\text{world}} = (a(t), 0)$$
+  $$\vec{F}_{\text{restore,world}} = (-kx(t), 0)$$
+  $$\vec{F}_{\text{drive,world}} = (F_0 \cos(\Omega t), 0)$$
 
 ---
 
 ### 4.4 Visual Bounds & Dynamic Automatic Camera Fitting
 
-#### Why Fixed Camera Bounds Are Insufficient:
-Across the full parameter domain:
-- Minimum apparatus height: $m=0.2\text{ kg}, k=100\text{ N/m}, g=1.62\text{ m/s}^2 \implies \Delta l = 0.003\text{ m}$. Total length $\approx 0.40\text{ m}$.
-- Maximum standard apparatus height: $m=3.0\text{ kg}, k=15\text{ N/m}, g=9.80\text{ m/s}^2 \implies \Delta l = 1.96\text{ m}$. With amplitude $A=0.4\text{ m}$ and bob dimensions, total length $\approx 2.9\text{ m}$.
-A single static camera view would either shrink small oscillations into unreadable specks or clip large elongations completely off-screen.
-
-#### Automatic Camera Fitting Algorithm:
-The simulation container applies dynamic camera framing whenever parameters change:
-1. Compute peak vertical extent in physical space:
-   $$y_{\min,\text{phys}} = \max(0.05, L_0 + \Delta l - A_{\max})$$
-   $$y_{\max,\text{phys}} = L_0 + \Delta l + A_{\max} + h_{\text{bob}} + h_{\text{margin}}$$
-   where $h_{\text{bob}} = 0.15\text{ m}$ and $h_{\text{margin}} = 0.20\text{ m}$ accounts for vector arrows and measurement labels.
-2. Convert to world bounding box:
-   $$Y_{\text{top,world}} = Y_{\text{ceiling}} + 0.15\text{ m} \quad (\text{includes ceiling bracket})$$
-   $$Y_{\text{bottom,world}} = Y_{\text{ceiling}} - y_{\max,\text{phys}}$$
-3. Center and Zoom Camera2D:
-   $$Y_{\text{center}} = \frac{Y_{\text{top,world}} + Y_{\text{bottom,world}}}{2}$$
-   $$H_{\text{world}} = Y_{\text{top,world}} - Y_{\text{bottom,world}}$$
-   $$\text{camera.setViewportHeight}(H_{\text{world}} \times 1.15) \quad (\text{15\% visual padding})$$
-   $$\text{camera.setCenter}(0.0, Y_{\text{center}})$$
-This guarantees that for every possible parameter configuration, the ceiling bracket, helical spring coils, natural length line, equilibrium line, mass bob, and vector arrows remain perfectly centered, fully visible, and sharply rendered on both 16:9 TV displays and mobile viewports.
+#### Apparatus-Specific Automatic Camera Framing:
+1. **Vertical Apparatus Viewport:**
+   Frames the ceiling bracket, coils, and bob:
+   $$Y_{\text{top,world}} = Y_{\text{ceiling}} + 0.15\text{ m}$$
+   $$Y_{\text{bottom,world}} = Y_{\text{ceiling}} - (L_0 + \Delta l + A_{\max} + h_{\text{bob}} + 0.20\text{ m})$$
+   $$\text{camera.setViewportHeight}((Y_{\text{top}} - Y_{\text{bottom}}) \times 1.15), \quad \text{camera.setCenter}(0.0, (Y_{\text{top}} + Y_{\text{bottom}})/2)$$
+2. **Horizontal Apparatus Viewport (Forced Oscillation & Resonance):**
+   Frames the wall anchor, linear air track, and full resonance excursion:
+   $$X_{\min,\text{world}} = X_{\text{wall}} - 0.25\text{ m} \quad (\text{includes wall mount})$$
+   $$X_{\max,\text{world}} = X_{\text{wall}} + L_0 + A_{\max} + w_{\text{block}} + 0.35\text{ m}$$
+   $$\text{camera.setViewportWidth}((X_{\max} - X_{\min}) \times 1.15), \quad \text{camera.setCenter}((X_{\min} + X_{\max})/2, Y_{\text{track}})$$
+This guarantees that for both vertical free oscillation and horizontal forced resonance ($A \approx 2.0\text{ m}$), the entire apparatus is centered, unclipped, and rendered with 15% comfortable margin on smart TV displays.
 
 ---
 

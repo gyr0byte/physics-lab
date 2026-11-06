@@ -15,6 +15,8 @@ import {
   stepNonlinearPendulumRK4,
   transformToWorldCoordinates,
   computeAutoCameraBounds,
+  transformToHorizontalWorldCoordinates,
+  computeHorizontalAutoCameraBounds,
   validateSpringParams,
   DEFAULT_SPRING_PARAMS,
   DEFAULT_PENDULUM_PARAMS,
@@ -22,6 +24,7 @@ import {
   DEFAULT_DRIVER_PARAMS,
   UNDAMPED_RESONANCE_PRESET,
   MAX_ENVELOPE_DAMPING_RATIO,
+  SPRING_SOLID_HEIGHT,
   ForcedIntegrationState,
   PendulumState,
 } from '../../src/physics/SimpleHarmonicPhysics';
@@ -110,10 +113,11 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(res.staticElongation).toBeNull();
     });
 
-    it('rejects initial displacement exceeding ceiling clearance', () => {
+    it('rejects initial displacement exceeding vertical apparatus travel limit', () => {
       // L0 = 0.40, deltaL = 0.392 => total rest length = 0.792 m
-      // Max allowed amplitude = 0.85 * 0.792 = 0.6732 m
-      // Requesting 0.80 m would hit ceiling
+      // L_solid = 0.10 m => travel clearance = 0.792 - 0.10 = 0.692 m
+      // Max allowed amplitude = 0.85 * 0.692 = 0.5882 m
+      // Requesting 0.80 m exceeds travel limit towards ceiling mount
       const res = validateSpringParams({
         mass: 1.0,
         springConstant: 25.0,
@@ -123,7 +127,87 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       });
 
       expect(res.valid).toBe(false);
-      expect(res.errors.some(e => e.includes('ceiling clearance'))).toBe(true);
+      expect(res.errors.some(e => e.includes('vertical apparatus travel limit'))).toBe(true);
+    });
+
+    it('validates horizontal air track apparatus constraints', () => {
+      // 1. Valid horizontal configuration with large excursion (A = 2.0 m)
+      const validHoriz = validateSpringParams(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
+          naturalLength: 0.40,
+          initialDisplacement: 2.0,
+        },
+        { orientation: 'horizontal' }
+      );
+      expect(validHoriz.valid).toBe(true);
+      expect(validHoriz.staticElongation).toBe(0.0);
+
+      // 2. Compression solid height limit: L0 = 0.40, L_solid = 0.10 => max compression = 0.30 m
+      // Initial displacement x0 = -0.35 m exceeds solid height
+      const invalidComp = validateSpringParams(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
+          naturalLength: 0.40,
+          initialDisplacement: -0.35,
+        },
+        { orientation: 'horizontal' }
+      );
+      expect(invalidComp.valid).toBe(false);
+      expect(invalidComp.errors.some(e => e.includes('horizontal spring solid height limit'))).toBe(true);
+
+      // 3. Track length limit: maxTrackTravel = 3.0 m. Excursion of 3.5 m rejected
+      const invalidTrack = validateSpringParams(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
+          naturalLength: 0.40,
+          initialDisplacement: 3.5,
+        },
+        { orientation: 'horizontal' }
+      );
+      expect(invalidTrack.valid).toBe(false);
+      expect(invalidTrack.errors.some(e => e.includes('horizontal guide track length'))).toBe(true);
+    });
+
+    it('throws explicit Error for non-positive or non-finite inputs in computeIdealSpringState and computeDampedSpringState', () => {
+      // Negative/zero mass
+      expect(() => computeIdealSpringState({ mass: 0, springConstant: 25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeIdealSpringState({ mass: -1.0, springConstant: 25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: 0, springConstant: 25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: -1.0, springConstant: 25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+
+      // Non-positive stiffness
+      expect(() => computeIdealSpringState({ mass: 1.0, springConstant: 0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeIdealSpringState({ mass: 1.0, springConstant: -25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: 1.0, springConstant: 0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: 1.0, springConstant: -25.0, initialDisplacement: 0.1 }, 0)).toThrow(/Invalid physical parameters/);
+
+      // Non-finite displacement or time
+      expect(() => computeIdealSpringState({ mass: 1.0, springConstant: 25.0, initialDisplacement: NaN }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeIdealSpringState({ mass: 1.0, springConstant: 25.0, initialDisplacement: 0.1 }, NaN)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: 1.0, springConstant: 25.0, initialDisplacement: NaN }, 0)).toThrow(/Invalid physical parameters/);
+      expect(() => computeDampedSpringState({ mass: 1.0, springConstant: 25.0, initialDisplacement: 0.1 }, NaN)).toThrow(/Invalid physical parameters/);
+    });
+
+    it('returns NaN for invalid parameters in computeSteadyStateAmplitude while returning 0 for F0 = 0', () => {
+      const validDriver = { driverForce: 2.0, drivingFrequency: 4.0 };
+      const validSpring = { mass: 1.0, springConstant: 25.0, dampingCoefficient: 0.2 };
+
+      // Invalid mass / stiffness / force / damping / frequency => NaN
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, mass: 0 }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, mass: -1.0 }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, mass: NaN }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, springConstant: 0 }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, springConstant: -25.0 }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude({ ...validSpring, dampingCoefficient: -0.2 }, validDriver))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude(validSpring, { driverForce: -2.0, drivingFrequency: 4.0 }))).toBe(true);
+      expect(Number.isNaN(computeSteadyStateAmplitude(validSpring, { driverForce: 2.0, drivingFrequency: NaN }))).toBe(true);
+
+      // F0 === 0 is valid physical zero forcing => returns 0.0, even at resonance
+      expect(computeSteadyStateAmplitude(validSpring, { driverForce: 0, drivingFrequency: 5.0 })).toBe(0.0);
     });
 
     it('rejects non-finite inputs: NaN, Infinity, and negative values', () => {
@@ -729,6 +813,49 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       const largeBounds = computeAutoCameraBounds(2.0, 0.40, 1.50, 0.40);
       expect(largeBounds.viewportHeight).toBeGreaterThan(smallBounds.viewportHeight);
       expect(largeBounds.centerY).toBeLessThan(smallBounds.centerY);
+    });
+
+    it('correctly maps horizontal air track physical coordinates to world coordinates', () => {
+      // Wall mount at X = -1.5, track elevation at Y = 0.5
+      // L0 = 0.40 m, displacement x = +0.25 m (stretched right)
+      // v = +1.2 m/s (moving right), a = -6.25 m/s² (accelerating left)
+      // Restoring force F_s = -k·x = -25 * 0.25 = -6.25 N (points leftward)
+      // Driving force F_drive = +2.0 N (points rightward)
+      const transform = transformToHorizontalWorldCoordinates({
+        wallWorldX: -1.5,
+        trackWorldY: 0.5,
+        naturalLength: 0.40,
+        displacement: 0.25,
+        velocity: 1.2,
+        acceleration: -6.25,
+        restoringForce: -6.25,
+        drivingForce: 2.0,
+      });
+
+      expect(transform.worldWallX).toBe(-1.5);
+      expect(transform.worldPositionY).toBe(0.5);
+      expect(transform.worldEquilibriumX).toBeCloseTo(-1.10, 4); // -1.5 + 0.40
+      expect(transform.worldPositionX).toBeCloseTo(-0.85, 4); // -1.10 + 0.25
+      expect(transform.worldVelocityX).toBe(1.2);
+      expect(transform.worldAccelerationX).toBe(-6.25);
+      expect(transform.worldRestoringForceX).toBe(-6.25); // points left (towards wall)
+      expect(transform.worldDrivingForceX).toBe(2.0); // points right
+    });
+
+    it('computes automatic camera bounds for horizontal air track with full resonance framing', () => {
+      // Small amplitude (off-resonance A = 0.20 m)
+      const smallBounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, 0.40, 0.20);
+      expect(smallBounds.minX).toBe(-1.25); // wallWorldX - 0.25
+      expect(smallBounds.maxX).toBeCloseTo(-1.0 + 0.40 + 0.20 + 0.20 + 0.35, 4); // 0.15
+      expect(smallBounds.viewportWidth).toBeCloseTo((0.15 - (-1.25)) * 1.15, 4);
+      expect(smallBounds.centerY).toBe(0.0);
+
+      // Large amplitude (resonance A = 2.0 m)
+      const resBounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, 0.40, 2.0);
+      expect(resBounds.viewportWidth).toBeGreaterThan(smallBounds.viewportWidth);
+      expect(resBounds.centerX).toBeGreaterThan(smallBounds.centerX);
+      expect(resBounds.minX).toBe(-1.25); // wall remains fixed
+      expect(resBounds.maxX).toBeCloseTo(-1.0 + 0.40 + 2.0 + 0.20 + 0.35, 4); // 1.95
     });
   });
 });

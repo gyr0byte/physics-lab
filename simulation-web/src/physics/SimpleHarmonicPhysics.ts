@@ -275,6 +275,28 @@ export interface VerticalWorldTransform {
   worldDrivingForceY: number;
 }
 
+/**
+ * Transformation from 1D horizontal physical coordinates (air track) to 2D Camera2D world coordinates.
+ */
+export interface HorizontalWorldTransform {
+  /** World X coordinate of rigid wall mount anchor */
+  worldWallX: number;
+  /** World X coordinate of equilibrium position (wallX + L0) */
+  worldEquilibriumX: number;
+  /** World X coordinate of oscillating block center */
+  worldPositionX: number;
+  /** World Y coordinate of horizontal track elevation */
+  worldPositionY: number;
+  /** World X component of velocity vector */
+  worldVelocityX: number;
+  /** World X component of acceleration vector */
+  worldAccelerationX: number;
+  /** World X component of restoring force vector (opposes displacement) */
+  worldRestoringForceX: number;
+  /** World X component of external driving force vector */
+  worldDrivingForceX: number;
+}
+
 // ============================================================================
 // Default Constants & Presets
 // ============================================================================
@@ -296,8 +318,9 @@ export const DEFAULT_PENDULUM_PARAMS: Required<PendulumParams> = {
 };
 
 /**
- * Normal forced-oscillation preset: includes finite damping (b = 0.20 N·s/m)
- * to ensure a realistic, finite steady-state amplitude away from the undamped singularity.
+ * Normal forced-oscillation preset: operates on a horizontal guided air track
+ * with finite damping (b = 0.20 N·s/m) to ensure a realistic, finite steady-state amplitude
+ * away from the undamped singularity.
  */
 export const DEFAULT_FORCED_SPRING_PARAMS: Required<SpringParams> = {
   mass: 1.0,
@@ -335,6 +358,9 @@ export const UNDAMPED_RESONANCE_PRESET: { spring: Required<SpringParams>; driver
 /** Safety clamp for static elongation to maintain physical classroom scale (meters) */
 export const MAX_STATIC_ELONGATION = 1.80;
 
+/** Minimum compressed spring length (solid height in meters) */
+export const SPRING_SOLID_HEIGHT = 0.10;
+
 /**
  * Maximum possible damping ratio across the entire valid parameter envelope:
  * m in [0.20, 3.00] kg, k in [10.0, 100.0] N/m, b in [0.0, 1.00] N·s/m
@@ -349,6 +375,11 @@ export const MAX_ENVELOPE_DAMPING_RATIO = 1.0 / (2.0 * Math.sqrt(10.0 * 0.20));
 // Validation & Core Statics
 // ============================================================================
 
+export interface SpringValidationOptions {
+  /** Physical apparatus orientation */
+  orientation?: 'vertical' | 'horizontal';
+}
+
 /**
  * Validates spring parameters against physical and apparatus safety constraints.
  *
@@ -359,11 +390,16 @@ export const MAX_ENVELOPE_DAMPING_RATIO = 1.0 / (2.0 * Math.sqrt(10.0 * 0.20));
  * - Rejects dampingCoefficient < 0.
  * - Rejects naturalLength <= 0.
  * - Rejects gravity <= 0.
- * - Strictly preserves the physical relationship: Δl = (m · g) / k.
- * - Rejects configurations where Δl > MAX_STATIC_ELONGATION (1.80 m).
- * - Rejects configurations where initial displacement exceeds ceiling clearance: |x0| > 0.85·(L0 + Δl).
+ * - For vertical apparatus: strictly preserves Δl = (m · g) / k, rejects Δl > 1.80 m,
+ *   and enforces solid height travel limit: |x0| <= 0.85·(L0 + Δl - L_solid).
+ * - For horizontal apparatus: equilibrium is L0, enforces solid height in compression
+ *   x0 >= -(L0 - L_solid), and allows horizontal guide travel up to 3.0 m.
  */
-export function validateSpringParams(params: SpringParams): SpringValidationResult {
+export function validateSpringParams(
+  params: SpringParams,
+  options?: SpringValidationOptions
+): SpringValidationResult {
+  const orientation = options?.orientation ?? 'vertical';
   const errors: string[] = [];
 
   // 1. Finite number and positivity checks
@@ -394,28 +430,51 @@ export function validateSpringParams(params: SpringParams): SpringValidationResu
   const gravity = params.gravity ?? DEFAULT_SPRING_PARAMS.gravity;
   const naturalLength = params.naturalLength ?? DEFAULT_SPRING_PARAMS.naturalLength;
 
-  // 2. Strict physical elongation check
-  const deltaL = (params.mass * gravity) / params.springConstant;
+  if (orientation === 'vertical') {
+    // 2. Strict physical elongation check
+    const deltaL = (params.mass * gravity) / params.springConstant;
 
-  if (deltaL > MAX_STATIC_ELONGATION) {
-    errors.push(
-      `Static elongation (${deltaL.toFixed(2)} m) exceeds maximum allowable apparatus limit of ${MAX_STATIC_ELONGATION} m.`
-    );
+    if (deltaL > MAX_STATIC_ELONGATION) {
+      errors.push(
+        `Static elongation (${deltaL.toFixed(2)} m) exceeds maximum allowable apparatus limit of ${MAX_STATIC_ELONGATION} m.`
+      );
+    }
+
+    // 3. Vertical solid height clearance check: y_phys >= L_solid = 0.10 m
+    const maxAllowedDisplacement = 0.85 * (naturalLength + deltaL - SPRING_SOLID_HEIGHT);
+    if (Math.abs(params.initialDisplacement) > maxAllowedDisplacement) {
+      errors.push(
+        `Initial displacement magnitude (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds vertical apparatus travel limit (${maxAllowedDisplacement.toFixed(2)} m, solid height = 0.10 m).`
+      );
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      staticElongation: errors.length === 0 ? deltaL : null,
+    };
+  } else {
+    // Horizontal apparatus (Low-friction linear air track)
+    const maxAllowedCompression = naturalLength - SPRING_SOLID_HEIGHT;
+    if (params.initialDisplacement < -maxAllowedCompression) {
+      errors.push(
+        `Initial compression (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds horizontal spring solid height limit (${maxAllowedCompression.toFixed(2)} m).`
+      );
+    }
+
+    const maxTrackTravel = 3.0; // meters along linear air track
+    if (params.initialDisplacement > maxTrackTravel) {
+      errors.push(
+        `Initial extension (${params.initialDisplacement.toFixed(2)} m) exceeds horizontal guide track length (${maxTrackTravel.toFixed(2)} m).`
+      );
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      staticElongation: 0.0, // horizontal spring has zero static gravitational elongation
+    };
   }
-
-  // 3. Ceiling clearance check
-  const maxAllowedDisplacement = 0.85 * (naturalLength + deltaL);
-  if (Math.abs(params.initialDisplacement) > maxAllowedDisplacement) {
-    errors.push(
-      `Initial displacement magnitude (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds ceiling clearance limit (${maxAllowedDisplacement.toFixed(2)} m).`
-    );
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    staticElongation: errors.length === 0 ? deltaL : null,
-  };
 }
 
 /**
@@ -574,6 +633,9 @@ export function computeDampedFrequencies(
  */
 export function computeIdealSpringState(params: SpringParams, time: number): SHMState {
   const { mass, springConstant, initialDisplacement: A } = params;
+  if (!Number.isFinite(mass) || mass <= 0 || !Number.isFinite(springConstant) || springConstant <= 0 || !Number.isFinite(A) || !Number.isFinite(time)) {
+    throw new Error(`Invalid physical parameters provided to computeIdealSpringState.`);
+  }
   const { omega0 } = computeSpringNaturalFrequencies(mass, springConstant);
 
   const displacement = A * Math.cos(omega0 * time);
@@ -622,18 +684,21 @@ export function computeIdealSpringState(params: SpringParams, time: number): SHM
  *    a(t) = γ²·A·(γt - 1) · e^(-γt) = -ω0²·x(t) - 2γ·v(t)
  *
  * 3. Overdamped (γ > ω0):
- *    Let β = √(γ² - ω0²):
- *    x(t) = A · e^(-γt) · [cosh(βt) + (γ/β)·sinh(βt)]
- *    v(t) = -(A·ω0²/β) · e^(-γt) · sinh(βt)
+ *    Let β = √(γ² - ω0²), λ_slow = ω0² / (γ + β), λ_fast = γ + β:
+ *    x(t) = A · [ ((γ + β) / (2β))·e^(-λ_slow·t) - (ω0² / (2β(γ + β)))·e^(-λ_fast·t) ]
+ *    v(t) = -(A·ω0² / (2β)) · [ e^(-λ_slow·t) - e^(-λ_fast·t) ]
  *    a(t) = -ω0²·x(t) - 2γ·v(t)
  */
 export function computeDampedSpringState(params: SpringParams, time: number): SHMState {
+  const { mass, springConstant, initialDisplacement: A } = params;
+  if (!Number.isFinite(mass) || mass <= 0 || !Number.isFinite(springConstant) || springConstant <= 0 || !Number.isFinite(A) || !Number.isFinite(time)) {
+    throw new Error(`Invalid physical parameters provided to computeDampedSpringState.`);
+  }
+
   const b = params.dampingCoefficient ?? 0;
   if (b === 0) {
     return computeIdealSpringState(params, time);
   }
-
-  const { mass, springConstant, initialDisplacement: A } = params;
   const dampedFreq = computeDampedFrequencies(mass, springConstant, b);
   const { omega0, gamma, regime } = dampedFreq;
 
@@ -735,16 +800,18 @@ export function computeSteadyStateAmplitude(
   const b = params.dampingCoefficient ?? 0;
   const { driverForce: F0, drivingFrequency: rawOmega } = driver;
 
-  if (mass <= 0 || springConstant <= 0) {
-    return 0;
+  if (
+    !Number.isFinite(mass) || mass <= 0 ||
+    !Number.isFinite(springConstant) || springConstant <= 0 ||
+    !Number.isFinite(F0) || F0 < 0 ||
+    !Number.isFinite(b) || b < 0 ||
+    !Number.isFinite(rawOmega)
+  ) {
+    return NaN;
   }
 
   // Zero forcing produces zero response everywhere, including at natural frequency
   if (F0 === 0) {
-    return 0;
-  }
-
-  if (F0 < 0) {
     return 0;
   }
 
@@ -1233,5 +1300,101 @@ export function computeAutoCameraBounds(
     viewportHeight,
     minY,
     maxY,
+  };
+}
+
+/**
+ * Transforms 1D horizontal physical air track coordinate into 2D Camera2D world coordinates.
+ *
+ * Physical system:
+ * - Rigid wall mount anchor at physical x = 0 (world coordinate (wallWorldX, trackWorldY))
+ * - Rightward direction is positive (+X) along the air track
+ * - Static equilibrium at X_eq = wallWorldX + L0
+ * - Displacement x = X - X_eq
+ *
+ * World system (Camera2D):
+ * - Rightward direction is positive (+X)
+ * - Upward direction is positive (+Y)
+ * - Wall mount anchor at (wallWorldX, trackWorldY)
+ * - World Equilibrium: X_eq = wallWorldX + L0
+ * - World Block Center: X_block = X_eq + x
+ * - World Velocity Vector: (v_phys, 0)
+ * - World Acceleration Vector: (a_phys, 0)
+ * - World Restoring Force Vector: (-k·x, 0) (points leftward towards wall when x > 0)
+ * - World Driving Force Vector: (F0·cos(Ωt), 0)
+ */
+export function transformToHorizontalWorldCoordinates(physical: {
+  wallWorldX: number;
+  trackWorldY: number;
+  naturalLength: number;
+  displacement: number;
+  velocity: number;
+  acceleration: number;
+  restoringForce: number;
+  drivingForce?: number;
+}): HorizontalWorldTransform {
+  const {
+    wallWorldX,
+    trackWorldY,
+    naturalLength,
+    displacement,
+    velocity,
+    acceleration,
+    restoringForce,
+    drivingForce = 0,
+  } = physical;
+
+  const worldEquilibriumX = wallWorldX + naturalLength;
+  const worldPositionX = worldEquilibriumX + displacement;
+
+  return {
+    worldWallX: wallWorldX,
+    worldEquilibriumX,
+    worldPositionX,
+    worldPositionY: trackWorldY,
+    worldVelocityX: velocity,
+    worldAccelerationX: acceleration,
+    worldRestoringForceX: restoringForce,
+    worldDrivingForceX: drivingForce,
+  };
+}
+
+/**
+ * Computes dynamic Camera2D viewport bounds for the horizontal air track apparatus.
+ * Frames the wall anchor, guide track, and peak oscillation excursion with 15% visual padding.
+ */
+export function computeHorizontalAutoCameraBounds(
+  wallWorldX: number,
+  trackWorldY: number,
+  naturalLength: number,
+  peakAmplitude: number
+): {
+  centerX: number;
+  centerY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  minX: number;
+  maxX: number;
+} {
+  const blockWidth = 0.20; // meters
+  const margin = 0.35; // meters for wall bracket, arrows, and labels
+
+  const minX = wallWorldX - 0.25; // includes wall mount bracket
+  const maxX = wallWorldX + naturalLength + peakAmplitude + blockWidth + margin;
+
+  const viewportWidth = (maxX - minX) * 1.15; // 15% padding
+  const centerX = (minX + maxX) / 2.0;
+
+  // Track height framing (16:9 aspect ratio target or minimum 1.2 m vertical viewport centered on track)
+  const viewportHeight = Math.max(1.2, viewportWidth * (9.0 / 16.0));
+  const centerY = trackWorldY;
+
+  return {
+    centerX,
+    centerY,
+    viewportWidth,
+    viewportHeight,
+    minX,
+    maxX,
   };
 }
