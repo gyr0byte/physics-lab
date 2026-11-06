@@ -200,6 +200,11 @@ export interface ResonanceCurvePoint {
 }
 
 /**
+ * Status of apparatus travel limit enforcement during forced oscillation.
+ */
+export type ApparatusLimitStatus = 'ok' | 'exceeded';
+
+/**
  * Time-domain numerical integration state for forced oscillations.
  */
 export interface ForcedIntegrationState {
@@ -223,6 +228,10 @@ export interface ForcedIntegrationState {
   effectivePotentialEnergy: number;
   /** Total instantaneous mechanical energy in Joules (E = K + U) */
   totalMechanicalEnergy: number;
+  /** Whether the apparatus travel limit has been exceeded (default: 'ok') */
+  apparatusStatus?: ApparatusLimitStatus;
+  /** Peak absolute displacement observed during the entire integration history (meters) */
+  peakDisplacement?: number;
 }
 
 /**
@@ -301,6 +310,71 @@ export interface HorizontalWorldTransform {
 // Default Constants & Presets
 // ============================================================================
 
+/** Safety clamp for static elongation to maintain physical classroom scale (meters) */
+export const MAX_STATIC_ELONGATION = 1.80;
+
+/** Minimum compressed spring length (solid height in meters) */
+export const SPRING_SOLID_HEIGHT = 0.10;
+
+// ============================================================================
+// Horizontal Air Track Apparatus Geometry
+// ============================================================================
+
+/**
+ * Natural (unstretched) length of the horizontal air track spring in meters.
+ * Independent from the vertical spring (L0_v = 0.40 m).
+ * 
+ * Design rationale: For the default forced experiment (m=1 kg, k=25 N/m, b=0.20 N·s/m, F0=2 N),
+ * steady-state resonance amplitude ≈ 2.0 m. The spring must accommodate symmetric oscillation
+ * around equilibrium without compressing below solid height:
+ *   L_min = L0_h - |x_max| ≥ L_solid
+ *   2.5 - 2.0 = 0.5 m ≥ 0.10 m ✓
+ * Maximum extension: L_max = L0_h + |x_max| = 2.5 + 2.0 = 4.5 m
+ * Transient overshoot (up to ~20% above steady state) is also accommodated:
+ *   2.5 - 2.4 = 0.10 m ≥ 0.10 m (borderline — see HORIZONTAL_MAX_TRAVEL)
+ */
+export const HORIZONTAL_NATURAL_LENGTH = 2.50;
+
+/**
+ * Maximum permissible operating length of the horizontal spring in meters.
+ * Beyond this extension, the spring is considered physically over-stretched.
+ * L_max_operating = L0_h + max_extension = 2.50 + 3.00 = 5.50 m
+ */
+export const HORIZONTAL_MAX_OPERATING_LENGTH = 5.50;
+
+/**
+ * Total usable length of the horizontal guide rail in meters.
+ * The block's center can travel from the wall (x = -(L0_h - L_solid))
+ * to x = HORIZONTAL_RAIL_LENGTH - L0_h from equilibrium.
+ * Rail length = 6.0 m accommodates L0_h + max resonance extension + block width + margin.
+ */
+export const HORIZONTAL_RAIL_LENGTH = 6.00;
+
+/**
+ * Maximum compression displacement magnitude for the horizontal spring.
+ * |x_compression_max| = L0_h - L_solid = 2.50 - 0.10 = 2.40 m
+ */
+export const HORIZONTAL_MAX_COMPRESSION = HORIZONTAL_NATURAL_LENGTH - SPRING_SOLID_HEIGHT;
+
+/**
+ * Maximum extension displacement for the horizontal spring.
+ * x_extension_max = L_max_operating - L0_h = 5.50 - 2.50 = 3.00 m
+ */
+export const HORIZONTAL_MAX_EXTENSION = HORIZONTAL_MAX_OPERATING_LENGTH - HORIZONTAL_NATURAL_LENGTH;
+
+/**
+ * Absolute maximum displacement magnitude on the horizontal apparatus.
+ * Travel limit = min(max_compression, max_extension, rail_limit)
+ * = min(2.40, 3.00, 6.00 - 2.50) = min(2.40, 3.00, 3.50) = 2.40 m
+ * 
+ * This is the binding constraint: compression against solid height.
+ */
+export const HORIZONTAL_MAX_TRAVEL = Math.min(
+  HORIZONTAL_MAX_COMPRESSION,
+  HORIZONTAL_MAX_EXTENSION,
+  HORIZONTAL_RAIL_LENGTH - HORIZONTAL_NATURAL_LENGTH
+);
+
 export const DEFAULT_SPRING_PARAMS: Required<SpringParams> = {
   mass: 1.0,
   springConstant: 25.0,
@@ -325,7 +399,7 @@ export const DEFAULT_PENDULUM_PARAMS: Required<PendulumParams> = {
 export const DEFAULT_FORCED_SPRING_PARAMS: Required<SpringParams> = {
   mass: 1.0,
   springConstant: 25.0,
-  naturalLength: 0.40,
+  naturalLength: HORIZONTAL_NATURAL_LENGTH,
   gravity: 9.80,
   dampingCoefficient: 0.20,
   initialDisplacement: 0.0,
@@ -344,7 +418,7 @@ export const UNDAMPED_RESONANCE_PRESET: { spring: Required<SpringParams>; driver
   spring: {
     mass: 1.0,
     springConstant: 25.0,
-    naturalLength: 0.40,
+    naturalLength: HORIZONTAL_NATURAL_LENGTH,
     gravity: 9.80,
     dampingCoefficient: 0.0,
     initialDisplacement: 0.0,
@@ -354,12 +428,6 @@ export const UNDAMPED_RESONANCE_PRESET: { spring: Required<SpringParams>; driver
     drivingFrequency: 5.0, // Exact resonance Ω = ω0 = 5.0 rad/s
   },
 };
-
-/** Safety clamp for static elongation to maintain physical classroom scale (meters) */
-export const MAX_STATIC_ELONGATION = 1.80;
-
-/** Minimum compressed spring length (solid height in meters) */
-export const SPRING_SOLID_HEIGHT = 0.10;
 
 /**
  * Maximum possible damping ratio across the entire valid parameter envelope:
@@ -454,18 +522,26 @@ export function validateSpringParams(
       staticElongation: errors.length === 0 ? deltaL : null,
     };
   } else {
-    // Horizontal apparatus (Low-friction linear air track)
-    const maxAllowedCompression = naturalLength - SPRING_SOLID_HEIGHT;
+    // Horizontal apparatus (Low-friction linear air track with independent geometry)
+    const horizL0 = params.naturalLength ?? HORIZONTAL_NATURAL_LENGTH;
+    const maxAllowedCompression = horizL0 - SPRING_SOLID_HEIGHT;
     if (params.initialDisplacement < -maxAllowedCompression) {
       errors.push(
-        `Initial compression (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds horizontal spring solid height limit (${maxAllowedCompression.toFixed(2)} m).`
+        `Initial compression (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds horizontal spring solid height limit (${maxAllowedCompression.toFixed(2)} m, L0_h = ${horizL0.toFixed(2)} m, L_solid = ${SPRING_SOLID_HEIGHT.toFixed(2)} m).`
       );
     }
 
-    const maxTrackTravel = 3.0; // meters along linear air track
-    if (params.initialDisplacement > maxTrackTravel) {
+    const maxExtension = HORIZONTAL_MAX_OPERATING_LENGTH - horizL0;
+    if (params.initialDisplacement > maxExtension) {
       errors.push(
-        `Initial extension (${params.initialDisplacement.toFixed(2)} m) exceeds horizontal guide track length (${maxTrackTravel.toFixed(2)} m).`
+        `Initial extension (${params.initialDisplacement.toFixed(2)} m) exceeds horizontal spring maximum operating length (L_max = ${HORIZONTAL_MAX_OPERATING_LENGTH.toFixed(2)} m, max extension = ${maxExtension.toFixed(2)} m).`
+      );
+    }
+
+    const railLimit = HORIZONTAL_RAIL_LENGTH - horizL0;
+    if (params.initialDisplacement > railLimit) {
+      errors.push(
+        `Initial displacement (${params.initialDisplacement.toFixed(2)} m) exceeds horizontal guide rail travel (${railLimit.toFixed(2)} m from equilibrium).`
       );
     }
 
@@ -475,6 +551,136 @@ export function validateSpringParams(
       staticElongation: 0.0, // horizontal spring has zero static gravitational elongation
     };
   }
+}
+
+/**
+ * Result of comprehensive trajectory validation for horizontal forced oscillation.
+ */
+export interface TrajectoryValidationResult {
+  /** Whether the complete trajectory stays strictly within physical apparatus limits */
+  valid: boolean;
+  /** List of explicit error descriptions if limits are exceeded */
+  errors: string[];
+  /** Maximum absolute displacement observed throughout the trajectory (meters) */
+  peakDisplacement: number;
+  /** Theoretical steady-state amplitude (meters) */
+  steadyStateAmplitude: number;
+  /** Ratio of peak transient displacement to steady-state amplitude (overshoot factor) */
+  transientOvershootFactor: number;
+  /** Timestamp in seconds when limit was first exceeded, or null if valid */
+  exceededAtTime: number | null;
+  /** Apparatus travel limit applied (meters) */
+  travelLimit: number;
+}
+
+export interface TrajectoryValidationOptions {
+  /** Simulation probe duration in seconds (default: 60.0 s, sufficient for transient settling) */
+  duration?: number;
+  /** Integration timestep in seconds (default: 0.002 s) */
+  dt?: number;
+  /** Maximum allowable displacement travel limit in meters (default: HORIZONTAL_MAX_TRAVEL = 2.40 m) */
+  travelLimit?: number;
+}
+
+/**
+ * Validates that the complete forced-oscillation trajectory stays within
+ * horizontal apparatus travel limits by running a probe RK4 simulation.
+ *
+ * Checks the complete time-domain response over `duration` seconds (default: 60 s),
+ * accounting for both transient overshoot and steady-state resonance response.
+ *
+ * Rules:
+ * - Checks initial displacement against static apparatus limits.
+ * - Simulates full time-domain trajectory using fixed-step RK4.
+ * - Detects compression beyond solid height: x < -(L0_h - L_solid) = -2.40 m.
+ * - Detects extension beyond maximum operating length: x > (L_max - L0_h) = +3.00 m.
+ * - Detects guide rail excursion beyond rail end: x > (L_rail - L0_h) = +3.50 m.
+ * - If travel limit is breached at any time t, flags valid: false with the exact breach time.
+ */
+export function validateForcedTrajectory(
+  params: SpringParams,
+  driver: ForcedDriverParams,
+  options?: TrajectoryValidationOptions
+): TrajectoryValidationResult {
+  const travelLimit = options?.travelLimit ?? HORIZONTAL_MAX_TRAVEL;
+  const duration = options?.duration ?? 60.0;
+  const dt = options?.dt ?? 0.002;
+
+  const errors: string[] = [];
+
+  // 1. Initial configuration validation
+  const initialValidation = validateSpringParams(params, { orientation: 'horizontal' });
+  if (!initialValidation.valid) {
+    return {
+      valid: false,
+      errors: [...initialValidation.errors],
+      peakDisplacement: Math.abs(params.initialDisplacement),
+      steadyStateAmplitude: NaN,
+      transientOvershootFactor: NaN,
+      exceededAtTime: 0,
+      travelLimit,
+    };
+  }
+
+  const { mass: m, springConstant: k } = params;
+  const b = params.dampingCoefficient ?? 0;
+  const { driverForce: F0, drivingFrequency: Omega } = driver;
+
+  // 2. Theoretical steady-state amplitude
+  const steadyStateA = computeSteadyStateAmplitude(params, driver);
+
+  // 3. Time-domain trajectory probe
+  let t = 0;
+  let x = params.initialDisplacement;
+  let v = 0;
+  let peakDisplacement = Math.abs(x);
+  let exceededAtTime: number | null = null;
+
+  const totalSteps = Math.ceil(duration / dt);
+
+  for (let step = 0; step < totalSteps; step++) {
+    const deriv = (tt: number, xx: number, vv: number) => {
+      const F_ext = F0 * Math.cos(Omega * tt);
+      const accel = (F_ext - b * vv - k * xx) / m;
+      return { dx: vv, dv: accel };
+    };
+
+    const k1 = deriv(t, x, v);
+    const k2 = deriv(t + 0.5 * dt, x + 0.5 * dt * k1.dx, v + 0.5 * dt * k1.dv);
+    const k3 = deriv(t + 0.5 * dt, x + 0.5 * dt * k2.dx, v + 0.5 * dt * k2.dv);
+    const k4 = deriv(t + dt, x + dt * k3.dx, v + dt * k3.dv);
+
+    x += (dt / 6.0) * (k1.dx + 2.0 * k2.dx + 2.0 * k3.dx + k4.dx);
+    v += (dt / 6.0) * (k1.dv + 2.0 * k2.dv + 2.0 * k3.dv + k4.dv);
+    t += dt;
+
+    const absX = Math.abs(x);
+    if (absX > peakDisplacement) {
+      peakDisplacement = absX;
+    }
+
+    if (absX > travelLimit && exceededAtTime === null) {
+      exceededAtTime = t;
+      errors.push(
+        `Trajectory excursion (${absX.toFixed(2)} m) exceeds horizontal apparatus travel limit (${travelLimit.toFixed(2)} m) at t = ${t.toFixed(2)} s.`
+      );
+      break; // apparatus limit exceeded
+    }
+  }
+
+  const overshootFactor = Number.isFinite(steadyStateA) && steadyStateA > 0
+    ? peakDisplacement / steadyStateA
+    : 1.0;
+
+  return {
+    valid: exceededAtTime === null,
+    errors,
+    peakDisplacement,
+    steadyStateAmplitude: steadyStateA,
+    transientOvershootFactor: overshootFactor,
+    exceededAtTime,
+    travelLimit,
+  };
 }
 
 /**
@@ -1032,8 +1238,16 @@ export function stepForcedOscillatorRK4(
   state: ForcedIntegrationState,
   params: SpringParams,
   driver: ForcedDriverParams,
-  dt: number
+  dt: number,
+  options?: { travelLimit?: number }
 ): ForcedIntegrationState {
+  const travelLimit = options?.travelLimit ?? HORIZONTAL_MAX_TRAVEL;
+
+  // If simulation has already halted due to exceeded apparatus travel limit, stay halted
+  if (state.apparatusStatus === 'exceeded') {
+    return state;
+  }
+
   const { mass: m, springConstant: k } = params;
   const b = params.dampingCoefficient ?? 0;
   const { driverForce: F0, drivingFrequency: Omega } = driver;
@@ -1089,6 +1303,29 @@ export function stepForcedOscillatorRK4(
   const effectivePotentialEnergy = 0.5 * k * newX * newX;
   const totalMechanicalEnergy = kineticEnergy + effectivePotentialEnergy;
 
+  const absDisplacement = Math.abs(newX);
+  const prevPeak = state.peakDisplacement ?? Math.abs(x0);
+  const newPeak = Math.max(prevPeak, absDisplacement);
+
+  if (absDisplacement > travelLimit) {
+    // Travel limit exceeded: stop simulation, clamp coordinates to limit, zero out velocity/accel
+    const clampedX = Math.sign(newX) * travelLimit;
+    return {
+      time: newTime,
+      displacement: clampedX,
+      velocity: 0,
+      acceleration: 0,
+      drivingForce: drivingForceNow,
+      externalWork: newW,
+      dissipatedEnergy: newDiss,
+      kineticEnergy: 0,
+      effectivePotentialEnergy: 0.5 * k * clampedX * clampedX,
+      totalMechanicalEnergy: 0.5 * k * clampedX * clampedX,
+      apparatusStatus: 'exceeded',
+      peakDisplacement: Math.max(newPeak, travelLimit),
+    };
+  }
+
   return {
     time: newTime,
     displacement: newX,
@@ -1100,6 +1337,8 @@ export function stepForcedOscillatorRK4(
     kineticEnergy,
     effectivePotentialEnergy,
     totalMechanicalEnergy,
+    apparatusStatus: 'ok',
+    peakDisplacement: newPeak,
   };
 }
 
@@ -1366,8 +1605,8 @@ export function transformToHorizontalWorldCoordinates(physical: {
 export function computeHorizontalAutoCameraBounds(
   wallWorldX: number,
   trackWorldY: number,
-  naturalLength: number,
-  peakAmplitude: number
+  naturalLength: number = HORIZONTAL_NATURAL_LENGTH,
+  peakAmplitude: number = 2.0
 ): {
   centerX: number;
   centerY: number;

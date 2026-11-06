@@ -18,6 +18,7 @@ import {
   transformToHorizontalWorldCoordinates,
   computeHorizontalAutoCameraBounds,
   validateSpringParams,
+  validateForcedTrajectory,
   DEFAULT_SPRING_PARAMS,
   DEFAULT_PENDULUM_PARAMS,
   DEFAULT_FORCED_SPRING_PARAMS,
@@ -25,6 +26,12 @@ import {
   UNDAMPED_RESONANCE_PRESET,
   MAX_ENVELOPE_DAMPING_RATIO,
   SPRING_SOLID_HEIGHT,
+  HORIZONTAL_NATURAL_LENGTH,
+  HORIZONTAL_MAX_OPERATING_LENGTH,
+  HORIZONTAL_RAIL_LENGTH,
+  HORIZONTAL_MAX_COMPRESSION,
+  HORIZONTAL_MAX_EXTENSION,
+  HORIZONTAL_MAX_TRAVEL,
   ForcedIntegrationState,
   PendulumState,
 } from '../../src/physics/SimpleHarmonicPhysics';
@@ -130,46 +137,125 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(res.errors.some(e => e.includes('vertical apparatus travel limit'))).toBe(true);
     });
 
-    it('validates horizontal air track apparatus constraints', () => {
-      // 1. Valid horizontal configuration with large excursion (A = 2.0 m)
-      const validHoriz = validateSpringParams(
+    it('rejects a 2 m horizontal oscillation with the old 0.40 m natural length', () => {
+      // With old natural length L0 = 0.40 m and solid height L_solid = 0.10 m,
+      // maximum compression is 0.40 - 0.10 = 0.30 m.
+      // An oscillation of 2.0 m in compression would give L = 0.40 - 2.0 = -1.60 m (physically impossible).
+      const oldGeom = validateSpringParams(
         {
           mass: 1.0,
           springConstant: 25.0,
           naturalLength: 0.40,
+          initialDisplacement: -2.0,
+        },
+        { orientation: 'horizontal' }
+      );
+
+      expect(oldGeom.valid).toBe(false);
+      expect(oldGeom.errors.some(e => e.includes('horizontal spring solid height limit'))).toBe(true);
+
+      // Trajectory probe with old geometry also fails
+      const trajOld = validateForcedTrajectory(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
+          naturalLength: 0.40,
+          dampingCoefficient: 0.20,
+          initialDisplacement: 0.0,
+        },
+        { driverForce: 2.0, drivingFrequency: 5.0 },
+        { travelLimit: 0.40 - SPRING_SOLID_HEIGHT } // 0.30 m limit
+      );
+      expect(trajOld.valid).toBe(false);
+      expect(trajOld.exceededAtTime).not.toBeNull();
+    });
+
+    it('supports the intended 2 m oscillation with revised horizontal geometry (L0_h = 2.50 m)', () => {
+      // Default horizontal spring has L0_h = 2.50 m, L_solid = 0.10 m.
+      // At max compression x = -2.0 m: L_min = 2.50 - 2.0 = 0.50 m >= 0.10 m (solid height) ✓
+      const compRes = validateSpringParams(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
+          initialDisplacement: -2.0,
+        },
+        { orientation: 'horizontal' }
+      );
+      expect(compRes.valid).toBe(true);
+      expect(compRes.staticElongation).toBe(0.0);
+
+      // At max extension x = +2.0 m: L_max = 2.50 + 2.0 = 4.50 m <= 5.50 m (max operating length) ✓
+      const extRes = validateSpringParams(
+        {
+          mass: 1.0,
+          springConstant: 25.0,
           initialDisplacement: 2.0,
         },
         { orientation: 'horizontal' }
       );
-      expect(validHoriz.valid).toBe(true);
-      expect(validHoriz.staticElongation).toBe(0.0);
+      expect(extRes.valid).toBe(true);
 
-      // 2. Compression solid height limit: L0 = 0.40, L_solid = 0.10 => max compression = 0.30 m
-      // Initial displacement x0 = -0.35 m exceeds solid height
-      const invalidComp = validateSpringParams(
+      // Binding travel limit is min(2.40, 3.00, 3.50) = 2.40 m
+      expect(HORIZONTAL_MAX_COMPRESSION).toBe(2.40);
+      expect(HORIZONTAL_MAX_EXTENSION).toBe(3.00);
+      expect(HORIZONTAL_MAX_TRAVEL).toBe(2.40);
+    });
+
+    it('enforces maximum operating length (5.50 m) and rail travel limits on horizontal apparatus', () => {
+      // L0_h = 2.50 m, L_max_op = 5.50 m => max allowed extension is 3.00 m.
+      // Requesting x0 = +3.20 m gives L = 5.70 m > 5.50 m, which must be rejected:
+      const exceedOperating = validateSpringParams(
         {
           mass: 1.0,
           springConstant: 25.0,
-          naturalLength: 0.40,
-          initialDisplacement: -0.35,
+          initialDisplacement: 3.20,
         },
         { orientation: 'horizontal' }
       );
-      expect(invalidComp.valid).toBe(false);
-      expect(invalidComp.errors.some(e => e.includes('horizontal spring solid height limit'))).toBe(true);
+      expect(exceedOperating.valid).toBe(false);
+      expect(exceedOperating.errors.some(e => e.includes('maximum operating length'))).toBe(true);
 
-      // 3. Track length limit: maxTrackTravel = 3.0 m. Excursion of 3.5 m rejected
-      const invalidTrack = validateSpringParams(
+      // Guide rail length is 6.00 m => rail limit from equilibrium is 6.00 - 2.50 = 3.50 m.
+      // Requesting x0 = +4.20 m with custom L0=2.0 m (rail limit 4.0 m) exceeds guide rail travel:
+      const exceedRail = validateSpringParams(
         {
           mass: 1.0,
           springConstant: 25.0,
-          naturalLength: 0.40,
-          initialDisplacement: 3.5,
+          naturalLength: 2.00,
+          initialDisplacement: 4.20,
         },
         { orientation: 'horizontal' }
       );
-      expect(invalidTrack.valid).toBe(false);
-      expect(invalidTrack.errors.some(e => e.includes('horizontal guide track length'))).toBe(true);
+      expect(exceedRail.valid).toBe(false);
+      expect(exceedRail.errors.some(e => e.includes('horizontal guide rail travel'))).toBe(true);
+    });
+
+    it('validates complete forced-oscillation trajectory for default experiment and resonance', () => {
+      // 1. Default forced experiment (Ω = 4.0 rad/s, off-resonance)
+      const defaultTraj = validateForcedTrajectory(
+        DEFAULT_FORCED_SPRING_PARAMS,
+        DEFAULT_DRIVER_PARAMS
+      );
+      expect(defaultTraj.valid).toBe(true);
+      expect(defaultTraj.exceededAtTime).toBeNull();
+      // Steady-state amplitude is ~0.22 m; transient peak reaches ~0.383 m
+      expect(defaultTraj.steadyStateAmplitude).toBeCloseTo(0.220, 2);
+      expect(defaultTraj.peakDisplacement).toBeLessThan(0.45);
+      expect(defaultTraj.peakDisplacement).toBeGreaterThan(defaultTraj.steadyStateAmplitude); // Transient overshoot demonstrated!
+      expect(defaultTraj.transientOvershootFactor).toBeGreaterThan(1.5);
+      expect(defaultTraj.peakDisplacement).toBeLessThan(HORIZONTAL_MAX_TRAVEL); // Well within 2.40 m limit ✓
+
+      // 2. Forced resonance experiment (Ω_res ≈ 4.998 rad/s, near resonance)
+      const omegaRes = Math.sqrt(24.98); // sqrt(omega0^2 - 2*gamma^2)
+      const resTraj = validateForcedTrajectory(
+        DEFAULT_FORCED_SPRING_PARAMS,
+        { driverForce: 2.0, drivingFrequency: omegaRes }
+      );
+      expect(resTraj.valid).toBe(true);
+      expect(resTraj.exceededAtTime).toBeNull();
+      // Peak displacement reaches ~1.995 m, staying within HORIZONTAL_MAX_TRAVEL = 2.40 m ✓
+      expect(resTraj.peakDisplacement).toBeCloseTo(2.00, 1);
+      expect(resTraj.peakDisplacement).toBeLessThan(HORIZONTAL_MAX_TRAVEL);
     });
 
     it('throws explicit Error for non-positive or non-finite inputs in computeIdealSpringState and computeDampedSpringState', () => {
@@ -781,6 +867,73 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
 
       expect(observedMaxA).toBeCloseTo(expectedA, 2);
     });
+
+    it('stops time-domain simulation explicitly when finite apparatus travel limit is exceeded', () => {
+      // Under undamped exact resonance, displacement grows linearly as ~0.2*t*sin(5t).
+      // At t ≈ 12.2 s, displacement reaches 2.40 m (HORIZONTAL_MAX_TRAVEL).
+      const { spring, driver } = UNDAMPED_RESONANCE_PRESET;
+      let state: ForcedIntegrationState = {
+        time: 0,
+        displacement: 0,
+        velocity: 0,
+        acceleration: 0,
+        drivingForce: 2.0,
+        externalWork: 0,
+        dissipatedEnergy: 0,
+        kineticEnergy: 0,
+        effectivePotentialEnergy: 0,
+        totalMechanicalEnergy: 0,
+      };
+
+      const dt = 0.002;
+      let limitReachedStep = -1;
+
+      for (let s = 0; s < 10000; s++) { // up to 20 seconds
+        state = stepForcedOscillatorRK4(state, spring, driver, dt);
+        if (state.apparatusStatus === 'exceeded') {
+          limitReachedStep = s;
+          break;
+        }
+      }
+
+      // Simulation must have detected limit breach and flagged 'exceeded'
+      expect(limitReachedStep).toBeGreaterThan(0);
+      expect(state.apparatusStatus).toBe('exceeded');
+      expect(state.displacement).toBeCloseTo(-HORIZONTAL_MAX_TRAVEL, 2);
+      expect(state.velocity).toBe(0); // Motion halted
+      expect(state.time).toBeGreaterThan(11.0);
+      expect(state.time).toBeLessThan(14.0);
+
+      // Verify freezing: further steps do not advance time or modify state
+      const frozenTime = state.time;
+      const frozenDisplacement = state.displacement;
+      const nextState = stepForcedOscillatorRK4(state, spring, driver, dt);
+      expect(nextState.time).toBe(frozenTime);
+      expect(nextState.displacement).toBe(frozenDisplacement);
+      expect(nextState.apparatusStatus).toBe('exceeded');
+    });
+
+    it('preserves theoretical mathematical singularity at undamped resonance in frequency response', () => {
+      // While finite apparatus stops the time-domain simulation at travelLimit,
+      // the analytical frequency-response transfer function maintains strict mathematical rigor:
+      const { spring, driver } = UNDAMPED_RESONANCE_PRESET;
+
+      // 1. Steady-state amplitude diverges to Infinity
+      const steadyStateA = computeSteadyStateAmplitude(spring, driver);
+      expect(steadyStateA).toBe(Infinity);
+
+      // 2. Phase lag is undefined (null) at singularity
+      const phase = computePhaseLag(spring, 5.0);
+      expect(phase).toBeNull();
+
+      // 3. Resonance curve tags exact resonance point with isSingularity: true
+      const curve = computeResonanceCurve(spring, 2.0);
+      const singularityPoint = curve.find(p => p.isSingularity);
+      expect(singularityPoint).toBeDefined();
+      expect(singularityPoint?.drivingFrequencyRad).toBeCloseTo(5.0, 6);
+      expect(singularityPoint?.amplitude).toBe(Infinity);
+      expect(singularityPoint?.phaseLagRad).toBeNull();
+    });
   });
 
   // ==========================================================================
@@ -817,14 +970,14 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
 
     it('correctly maps horizontal air track physical coordinates to world coordinates', () => {
       // Wall mount at X = -1.5, track elevation at Y = 0.5
-      // L0 = 0.40 m, displacement x = +0.25 m (stretched right)
+      // Default L0_h = 2.50 m, displacement x = +0.25 m (stretched right)
       // v = +1.2 m/s (moving right), a = -6.25 m/s² (accelerating left)
       // Restoring force F_s = -k·x = -25 * 0.25 = -6.25 N (points leftward)
       // Driving force F_drive = +2.0 N (points rightward)
       const transform = transformToHorizontalWorldCoordinates({
         wallWorldX: -1.5,
         trackWorldY: 0.5,
-        naturalLength: 0.40,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH,
         displacement: 0.25,
         velocity: 1.2,
         acceleration: -6.25,
@@ -834,8 +987,8 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
 
       expect(transform.worldWallX).toBe(-1.5);
       expect(transform.worldPositionY).toBe(0.5);
-      expect(transform.worldEquilibriumX).toBeCloseTo(-1.10, 4); // -1.5 + 0.40
-      expect(transform.worldPositionX).toBeCloseTo(-0.85, 4); // -1.10 + 0.25
+      expect(transform.worldEquilibriumX).toBeCloseTo(1.00, 4); // -1.5 + 2.50
+      expect(transform.worldPositionX).toBeCloseTo(1.25, 4); // 1.00 + 0.25
       expect(transform.worldVelocityX).toBe(1.2);
       expect(transform.worldAccelerationX).toBe(-6.25);
       expect(transform.worldRestoringForceX).toBe(-6.25); // points left (towards wall)
@@ -856,6 +1009,16 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(resBounds.centerX).toBeGreaterThan(smallBounds.centerX);
       expect(resBounds.minX).toBe(-1.25); // wall remains fixed
       expect(resBounds.maxX).toBeCloseTo(-1.0 + 0.40 + 2.0 + 0.20 + 0.35, 4); // 1.95
+    });
+
+    it('computes automatic camera bounds for revised horizontal apparatus with default L0_h = 2.50 m', () => {
+      // With default L0_h = 2.50 m and peak resonance excursion A = 2.0 m
+      const bounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, HORIZONTAL_NATURAL_LENGTH, 2.0);
+      expect(bounds.minX).toBe(-1.25); // wallWorldX - 0.25
+      // maxX = wallWorldX + L0_h + A + blockWidth + margin = -1.0 + 2.50 + 2.00 + 0.20 + 0.35 = 4.05 m
+      expect(bounds.maxX).toBeCloseTo(4.05, 4);
+      expect(bounds.viewportWidth).toBeCloseTo((4.05 - (-1.25)) * 1.15, 4); // 5.30 * 1.15 = 6.095 m
+      expect(bounds.centerY).toBe(0.0);
     });
   });
 });
