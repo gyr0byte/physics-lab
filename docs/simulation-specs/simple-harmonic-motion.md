@@ -177,15 +177,32 @@ $$\omega_d = \sqrt{\omega_0^2 - \gamma^2} = \omega_0 \sqrt{1 - \zeta^2}$$
 Damped period:
 $$T_d = \frac{2\pi}{\omega_d} > T_0$$
 
-#### Exact Analytical Kinematics (Release from Rest: $x(0) = A, v(0) = 0$):
-Applying initial conditions to the general solution $x(t) = e^{-\gamma t}(C_1 \cos\omega_d t + C_2 \sin\omega_d t)$:
-$$x(0) = C_1 = A$$
-$$v(0) = -\gamma C_1 + \omega_d C_2 = 0 \implies C_2 = \frac{\gamma}{\omega_d} A$$
+#### Exact Analytical Solutions Across All Damping Regimes (Release from Rest: $x(0) = A, v(0) = 0$):
 
-Thus, the **exact analytical solution** is:
-$$x(t) = A e^{-\gamma t} \left[\cos(\omega_d t) + \frac{\gamma}{\omega_d} \sin(\omega_d t)\right]$$
-$$v(t) = -\frac{A \omega_0^2}{\omega_d} e^{-\gamma t} \sin(\omega_d t)$$
-$$a(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v(t)$$
+1. **Underdamped Regime ($\gamma < \omega_0 \iff \zeta < 1$):**
+   - Natural damped frequency: $\omega_d = \sqrt{\omega_0^2 - \gamma^2}$
+   - Kinematics satisfying $x(0) = A, v(0) = 0$:
+     $$x(t) = A e^{-\gamma t} \left[\cos(\omega_d t) + \frac{\gamma}{\omega_d} \sin(\omega_d t)\right]$$
+     $$v(t) = -\frac{A \omega_0^2}{\omega_d} e^{-\gamma t} \sin(\omega_d t)$$
+     $$a(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v(t)$$
+   - Upper amplitude envelope: $\pm \frac{A \omega_0}{\omega_d} e^{-\gamma t}$
+
+2. **Critically Damped Regime ($\gamma = \omega_0 \iff \zeta = 1$):**
+   - Kinematics satisfying $x(0) = A, v(0) = 0$:
+     $$x(t) = A (1 + \gamma t) e^{-\gamma t}$$
+     $$v(t) = -\gamma^2 A t e^{-\gamma t} = -\omega_0^2 A t e^{-\omega_0 t}$$
+     $$a(t) = \gamma^2 A (\gamma t - 1) e^{-\gamma t} = -\omega_0^2 x(t) - 2\gamma v(t)$$
+   - Returns to equilibrium without oscillation in the shortest possible time.
+
+3. **Overdamped Regime ($\gamma > \omega_0 \iff \zeta > 1$):**
+   - Let $\beta = \sqrt{\gamma^2 - \omega_0^2} > 0$.
+   - **Numerically Stable Formulation:** Direct evaluation of $e^{-\gamma t}\cosh(\beta t)$ causes arithmetic overflow (`Infinity`) and `NaN` at large $t$ because $\beta t \to \infty$. To guarantee absolute numerical stability for all $t \in [0, \infty)$, the solution is factored into strictly decaying exponentials:
+     $$\lambda_{\text{slow}} = \gamma - \beta = \frac{\omega_0^2}{\gamma + \beta} > 0$$
+     $$\lambda_{\text{fast}} = \gamma + \beta > 0$$
+     $$x(t) = A \left[ \frac{\gamma + \beta}{2\beta} e^{-\lambda_{\text{slow}} t} - \frac{\omega_0^2}{2\beta(\gamma + \beta)} e^{-\lambda_{\text{fast}} t} \right]$$
+     $$v(t) = -\frac{A \omega_0^2}{2\beta} \left( e^{-\lambda_{\text{slow}} t} - e^{-\lambda_{\text{fast}} t} \right)$$
+     $$a(t) = -\omega_0^2 x(t) - 2\gamma v(t)$$
+   - At $t = 0$: $x(0) = A$, $v(0) = 0$. For all $t > 0$, both $e^{-\lambda_{\text{slow}} t} \in (0, 1]$ and $e^{-\lambda_{\text{fast}} t} \in (0, 1]$ are strictly bounded, non-overflowing decaying terms that asymptotically approach zero.
 
 #### Amplitude Envelope & Energy Dissipation:
 - **Exponential Amplitude Envelope:**
@@ -229,13 +246,20 @@ $$x(t) = x_{\text{transient}}(t) + x_{\text{steady}}(t)$$
      - **High Frequency ($\Omega \gg \omega_0$):** $\omega_0^2 - \Omega^2 < 0 \implies \delta \to \pi = 180^\circ$ (mass oscillates in direct opposition to driver).
 
 3. **Special Handling for Zero Damping ($\gamma = 0, b = 0$):**
-   - For $\Omega \ne \omega_0$:
+   - **Zero Forcing ($F_0 = 0$):**
+     If driving force is zero, steady-state response amplitude is identically zero for all frequencies, including at natural frequency: $A(\omega_0) = 0$.
+   - **Undamped Off-Resonance Clarification ($\Omega \ne \omega_0$):**
+     For $F_0 > 0$ and $\Omega \ne \omega_0$, the analytical particular integral has amplitude:
      $$A(\Omega) = \frac{F_0 / m}{|\omega_0^2 - \Omega^2|}, \quad \delta = \begin{cases} 0 & \text{if } \Omega < \omega_0 \\ \pi & \text{if } \Omega > \omega_0 \end{cases}$$
-   - **Exact Undamped Resonance ($\Omega = \omega_0$):**
-     The denominator vanishes; steady-state amplitude **diverges to infinity** ($A \to \infty$). No finite periodic steady state exists.
-     The exact analytical time-domain solution released from rest ($x(0)=0, v(0)=0$) grows linearly with time:
+     > **Critical Educational Clarification:** $A(\Omega)$ represents strictly the amplitude of the **particular integral (frequency-response transfer function)**, NOT the total time-domain motion. Because damping is zero ($b=0$), the complementary natural-frequency transient solution $x_h(t) = C_1\cos\omega_0 t + C_2\sin\omega_0 t$ **never decays**.
+     For release from rest ($x(0)=0, v(0)=0$), the exact time-domain motion is:
+     $$x(t) = \frac{F_0 / m}{\omega_0^2 - \Omega^2} (\cos\Omega t - \cos\omega_0 t) = \frac{2 F_0 / m}{\omega_0^2 - \Omega^2} \sin\left(\frac{\omega_0 - \Omega}{2} t\right) \sin\left(\frac{\omega_0 + \Omega}{2} t\right)$$
+     This exhibits persistent **beats** with beat frequency $|\omega_0 - \Omega|$ and never settles into a single-frequency steady state.
+   - **Exact Undamped Resonance ($F_0 > 0, \Omega = \omega_0$):**
+     The denominator vanishes; steady-state amplitude **diverges to infinity** ($A \to \infty$), and phase lag is undefined (`null`). No finite periodic steady state exists.
+     The exact analytical time-domain solution released from rest grows linearly with time:
      $$x(t) = \frac{F_0}{2m\omega_0} t \sin(\omega_0 t)$$
-     > **Engineering Rule:** The simulation and frequency-response plots **must never present a finite steady-state amplitude** at exact undamped resonance. The resonance curve displays an asymptotic vertical discontinuity at $\Omega = \omega_0$ when $b=0$.
+     > **Engineering & Rendering Rule:** The simulation and frequency-response plots **must never present a finite steady-state amplitude** at exact undamped resonance. In `computeResonanceCurve()`, $\omega_0$ is explicitly sampled and identified with `isSingularity: true`. The Canvas renderer draws an asymptotic gap rather than passing non-finite values into Canvas rendering paths.
 
 4. **Forced Motion Energy Accounting (External Work vs. Viscous Dissipation):**
    In forced oscillation, mechanical energy is continuously injected by the driving agent and dissipated by viscous resistance:

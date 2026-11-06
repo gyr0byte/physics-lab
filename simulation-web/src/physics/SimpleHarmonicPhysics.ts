@@ -192,6 +192,11 @@ export interface ResonanceCurvePoint {
   phaseLagRad: number | null;
   /** Phase lag in degrees (δ ∈ [0°, 180°], or null if undefined at undamped resonance) */
   phaseLagDeg: number | null;
+  /**
+   * Whether this point represents a mathematical singularity / vertical asymptote.
+   * If true, renderer must break the curve / draw an asymptotic gap rather than passing Infinity to Canvas coordinates.
+   */
+  isSingularity?: boolean;
 }
 
 /**
@@ -656,14 +661,25 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
     acceleration = gamma * gamma * A * (gamma * time - 1.0) * expDecay;
     envelope = Math.abs(displacement);
   } else {
-    // Overdamped
+    // Overdamped (numerically stable formulation using strictly decaying exponentials)
+    // β = √(γ² - ω0²)
+    // λ_slow = γ - β = ω0² / (γ + β) > 0
+    // λ_fast = γ + β > 0
+    // x(t) = A * [ ((γ + β)/(2β)) * exp(-λ_slow*t) - (ω0²/(2β(γ + β))) * exp(-λ_fast*t) ]
+    // v(t) = - (A·ω0² / (2β)) * [ exp(-λ_slow*t) - exp(-λ_fast*t) ]
+    // a(t) = -ω0²·x(t) - 2γ·v(t)
     const beta = Math.sqrt(gamma * gamma - omega0 * omega0);
-    const expDecay = Math.exp(-gamma * time);
-    const coshTerm = Math.cosh(beta * time);
-    const sinhTerm = Math.sinh(beta * time);
+    const lambdaSlow = (omega0 * omega0) / (gamma + beta);
+    const lambdaFast = gamma + beta;
 
-    displacement = A * expDecay * (coshTerm + (gamma / beta) * sinhTerm);
-    velocity = -((A * omega0 * omega0) / beta) * expDecay * sinhTerm;
+    const expSlow = Math.exp(-lambdaSlow * time);
+    const expFast = Math.exp(-lambdaFast * time);
+
+    const cSlow = (gamma + beta) / (2.0 * beta);
+    const cFast = (omega0 * omega0) / (2.0 * beta * (gamma + beta));
+
+    displacement = A * (cSlow * expSlow - cFast * expFast);
+    velocity = -((A * omega0 * omega0) / (2.0 * beta)) * (expSlow - expFast);
     acceleration = -omega0 * omega0 * displacement - 2.0 * gamma * velocity;
     envelope = Math.abs(displacement);
   }
@@ -701,9 +717,15 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
  *   A(Ω) = (F0 / m) / √((ω0² - Ω²)² + 4γ²Ω²)
  *
  * Rules:
+ * - If driverForce == 0: returns 0 for all frequencies, including exact resonance.
  * - At zero frequency (Ω = 0): returns static deflection A(0) = F0 / k.
- * - If b = 0 and |Ω - ω0| < 1e-12: returns Infinity (undamped resonance divergence).
- * - Never returns a finite steady-state value at exact undamped resonance.
+ * - If b = 0, F0 > 0, and |Ω - ω0| < 1e-12: returns Infinity (undamped resonance divergence).
+ * - Never returns a finite steady-state value for nonzero forcing at exact undamped resonance.
+ *
+ * Educational Note for b = 0, Ω != ω0:
+ * A(Ω) represents strictly the amplitude of the particular integral (frequency-response transfer function).
+ * In time domain, the un-damped complementary natural-frequency transient never decays, resulting in persistent
+ * beating x(t) = (2F0/m)/(ω0² - Ω²) · sin((ω0 - Ω)t / 2) · sin((ω0 + Ω)t / 2) rather than settling to single-frequency steady state.
  */
 export function computeSteadyStateAmplitude(
   params: SpringParams,
@@ -713,7 +735,16 @@ export function computeSteadyStateAmplitude(
   const b = params.dampingCoefficient ?? 0;
   const { driverForce: F0, drivingFrequency: rawOmega } = driver;
 
-  if (mass <= 0 || springConstant <= 0 || F0 < 0) {
+  if (mass <= 0 || springConstant <= 0) {
+    return 0;
+  }
+
+  // Zero forcing produces zero response everywhere, including at natural frequency
+  if (F0 === 0) {
+    return 0;
+  }
+
+  if (F0 < 0) {
     return 0;
   }
 
@@ -730,7 +761,7 @@ export function computeSteadyStateAmplitude(
   if (b === 0) {
     const diff = Math.abs(omega0 * omega0 - Omega * Omega);
     if (diff < 1e-12) {
-      return Infinity; // Diverges at exact undamped resonance
+      return Infinity; // Diverges at exact undamped resonance with non-zero driving force
     }
     return (F0 / mass) / diff;
   }
@@ -814,6 +845,15 @@ export function computeResonancePeak(
 
   // Resonance peak exists
   if (b === 0) {
+    if (driverForce === 0) {
+      return {
+        hasResonancePeak: false,
+        resonantFrequencyRad: null,
+        resonantFrequencyHz: null,
+        peakAmplitude: 0,
+        qualityFactor: Infinity,
+      };
+    }
     return {
       hasResonancePeak: true,
       resonantFrequencyRad: omega0,
@@ -842,6 +882,10 @@ export function computeResonancePeak(
 /**
  * Generates an array of points for the analytical frequency response curve A(Ω).
  * Starts at Ω = 0 by default to display the static deflection endpoint A(0) = F0 / k.
+ *
+ * Guarantees that the exact natural frequency ω0 is explicitly sampled when in range,
+ * tagging undamped resonance singularities with `isSingularity: true` so the renderer
+ * can draw an asymptotic gap instead of plotting non-finite numbers.
  */
 export function computeResonanceCurve(
   params: SpringParams,
@@ -849,17 +893,45 @@ export function computeResonanceCurve(
   options?: { minOmega?: number; maxOmega?: number; steps?: number }
 ): ResonanceCurvePoint[] {
   const { mass, springConstant } = params;
+  const b = params.dampingCoefficient ?? 0;
   const { omega0 } = computeSpringNaturalFrequencies(mass, springConstant);
 
   const minOmega = options?.minOmega ?? 0.0;
   const maxOmega = options?.maxOmega ?? 2.5 * omega0;
   const steps = options?.steps ?? 100;
 
-  const points: ResonanceCurvePoint[] = [];
+  // Build list of sample frequencies
+  const frequencies: number[] = [];
   const dOmega = (maxOmega - minOmega) / (steps - 1);
 
   for (let i = 0; i < steps; i++) {
-    const Omega = minOmega + i * dOmega;
+    frequencies.push(minOmega + i * dOmega);
+  }
+
+  // Ensure exact omega0 and adjacent boundary points are explicitly sampled
+  if (omega0 >= minOmega && omega0 <= maxOmega) {
+    frequencies.push(omega0);
+    if (b === 0 && driverForce > 0) {
+      const eps = 0.005 * omega0;
+      if (omega0 - eps > minOmega) frequencies.push(omega0 - eps);
+      if (omega0 + eps < maxOmega) frequencies.push(omega0 + eps);
+    }
+  }
+
+  // Sort and remove duplicates within 1e-9 tolerance
+  frequencies.sort((a, b) => a - b);
+  const uniqueFreqs: number[] = [];
+  for (const f of frequencies) {
+    const last = uniqueFreqs[uniqueFreqs.length - 1];
+    if (last === undefined || Math.abs(f - last) > 1e-9) {
+      uniqueFreqs.push(f);
+    }
+  }
+
+  const points: ResonanceCurvePoint[] = [];
+
+  for (const Omega of uniqueFreqs) {
+    const isUndampedSingularity = b === 0 && driverForce > 0 && Math.abs(Omega - omega0) < 1e-9;
     const amplitude = computeSteadyStateAmplitude(params, { driverForce, drivingFrequency: Omega });
     const phaseLagRad = computePhaseLag(params, Omega);
     const phaseLagDeg = phaseLagRad !== null ? (phaseLagRad * 180.0) / Math.PI : null;
@@ -870,6 +942,7 @@ export function computeResonanceCurve(
       amplitude,
       phaseLagRad,
       phaseLagDeg,
+      isSingularity: isUndampedSingularity,
     });
   }
 

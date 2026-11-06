@@ -458,6 +458,30 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
           expect(Math.abs(residual)).toBeLessThan(1e-10);
         }
       });
+
+      it('remains numerically stable, finite, and non-NaN at long elapsed times and heavy overdamping', () => {
+        // m = 1.0 kg, k = 25.0 N/m, b = 30.0 N·s/m (gamma = 15.0 >> omega0 = 5.0)
+        const heavyOverdamped = {
+          mass: 1.0,
+          springConstant: 25.0,
+          dampingCoefficient: 30.0,
+          initialDisplacement: 0.30,
+        };
+
+        const times = [10.0, 50.0, 100.0, 500.0, 1000.0, 10000.0];
+        for (const t of times) {
+          const state = computeDampedSpringState(heavyOverdamped, t);
+
+          expect(Number.isFinite(state.displacement)).toBe(true);
+          expect(Number.isFinite(state.velocity)).toBe(true);
+          expect(Number.isFinite(state.acceleration)).toBe(true);
+          expect(Number.isNaN(state.displacement)).toBe(false);
+
+          // Asymptotically decays to 0 without blowing up or overflowing
+          expect(state.displacement).toBeGreaterThanOrEqual(0);
+          expect(state.displacement).toBeLessThan(0.30);
+        }
+      });
     });
   });
 
@@ -531,6 +555,87 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(curve[0].drivingFrequencyRad).toBe(0.0);
       expect(curve[0].amplitude).toBeCloseTo(2.0 / 25.0, 6);
       expect(curve[0].phaseLagRad).toBe(0.0);
+    });
+
+    it('handles zero driving force (F0 = 0) with zero response amplitude at exact resonance', () => {
+      const undamped = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.0 };
+
+      // F0 = 0 at exact resonance Ω = ω0 = 5.0
+      const ampZeroForce = computeSteadyStateAmplitude(undamped, { driverForce: 0.0, drivingFrequency: 5.0 });
+      expect(ampZeroForce).toBe(0.0);
+
+      const peakZeroForce = computeResonancePeak(undamped, 0.0);
+      expect(peakZeroForce.hasResonancePeak).toBe(false);
+      expect(peakZeroForce.peakAmplitude).toBe(0.0);
+
+      // Contrast with non-zero driving force at exact resonance
+      const ampNonzeroForce = computeSteadyStateAmplitude(undamped, { driverForce: 2.0, drivingFrequency: 5.0 });
+      expect(ampNonzeroForce).toBe(Infinity);
+
+      const peakNonzeroForce = computeResonancePeak(undamped, 2.0);
+      expect(peakNonzeroForce.hasResonancePeak).toBe(true);
+      expect(peakNonzeroForce.peakAmplitude).toBe(Infinity);
+    });
+
+    it('guarantees resonance curve explicitly samples ω0 and marks undamped singularity', () => {
+      const undamped = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.0 };
+      const curve = computeResonanceCurve(undamped, 2.0, { steps: 50 }); // steps intentionally coarse
+
+      // The exact natural frequency omega0 = 5.0 must NOT be missed due to step size
+      const singularPoint = curve.find(p => p.isSingularity === true);
+      expect(singularPoint).toBeDefined();
+      expect(singularPoint!.drivingFrequencyRad).toBeCloseTo(5.0, 9);
+      expect(singularPoint!.amplitude).toBe(Infinity);
+      expect(singularPoint!.phaseLagRad).toBeNull();
+
+      // Points immediately adjacent must be finite
+      const index = curve.indexOf(singularPoint!);
+      expect(index).toBeGreaterThan(0);
+      expect(index).toBeLessThan(curve.length - 1);
+      expect(Number.isFinite(curve[index - 1].amplitude)).toBe(true);
+      expect(Number.isFinite(curve[index + 1].amplitude)).toBe(true);
+
+      // Damped curve has no singularities
+      const dampedCurve = computeResonanceCurve({ ...undamped, dampingCoefficient: 0.2 }, 2.0);
+      expect(dampedCurve.some(p => p.isSingularity === true)).toBe(false);
+    });
+
+    it('demonstrates persistent beating in undamped forced motion rather than steady state decay', () => {
+      // b = 0, F0 = 2.0, Omega = 4.0, omega0 = 5.0
+      // Beat frequency = |omega0 - Omega| = 1.0 rad/s => T_beat = 2*pi / 1.0 ≈ 6.283 s
+      const params = { mass: 1.0, springConstant: 25.0, dampingCoefficient: 0.0, initialDisplacement: 0.0 };
+      const driver = { driverForce: 2.0, drivingFrequency: 4.0 };
+
+      let state: ForcedIntegrationState = {
+        time: 0,
+        displacement: 0,
+        velocity: 0,
+        acceleration: 0,
+        drivingForce: 2.0,
+        externalWork: 0,
+        dissipatedEnergy: 0,
+        kineticEnergy: 0,
+        effectivePotentialEnergy: 0,
+        totalMechanicalEnergy: 0,
+      };
+
+      const dt = 0.001;
+      const steps = Math.round((2.0 * Math.PI) / dt); // one beat period ≈ 6283 steps
+
+      let maxDisplacement = 0;
+      for (let s = 0; s < steps; s++) {
+        state = stepForcedOscillatorRK4(state, params, driver, dt);
+        maxDisplacement = Math.max(maxDisplacement, Math.abs(state.displacement));
+      }
+
+      // Theoretical beat envelope maximum: 2 * (F0 / m) / |omega0^2 - Omega^2| = 2 * 2.0 / (25 - 16) = 4 / 9 ≈ 0.444 m
+      expect(maxDisplacement).toBeCloseTo(4.0 / 9.0, 2);
+
+      // At end of beat period (t ≈ T_beat), displacement returns near zero
+      expect(Math.abs(state.displacement)).toBeLessThan(0.05);
+
+      // Dissipated energy must remain strictly zero
+      expect(state.dissipatedEnergy).toBe(0.0);
     });
 
     it('verifies instantaneous energy balance in forced RK4 simulation', () => {
