@@ -868,7 +868,7 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(observedMaxA).toBeCloseTo(expectedA, 2);
     });
 
-    it('stops time-domain simulation explicitly when finite apparatus travel limit is exceeded', () => {
+    it('stops time-domain simulation explicitly when finite apparatus travel limit would be exceeded, preserving physical state without impact fabrication', () => {
       // Under undamped exact resonance, displacement grows linearly as ~0.2*t*sin(5t).
       // At t ≈ 12.2 s, displacement reaches 2.40 m (HORIZONTAL_MAX_TRAVEL).
       const { spring, driver } = UNDAMPED_RESONANCE_PRESET;
@@ -889,9 +889,15 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       let limitReachedStep = -1;
 
       for (let s = 0; s < 10000; s++) { // up to 20 seconds
+        const prevState = state;
         state = stepForcedOscillatorRK4(state, spring, driver, dt);
         if (state.apparatusStatus === 'exceeded') {
           limitReachedStep = s;
+          // Verify that state matches prevState (the last valid physical state)
+          expect(state.time).toBe(prevState.time);
+          expect(state.displacement).toBe(prevState.displacement);
+          expect(state.velocity).toBe(prevState.velocity);
+          expect(state.acceleration).toBe(prevState.acceleration);
           break;
         }
       }
@@ -899,17 +905,31 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       // Simulation must have detected limit breach and flagged 'exceeded'
       expect(limitReachedStep).toBeGreaterThan(0);
       expect(state.apparatusStatus).toBe('exceeded');
-      expect(state.displacement).toBeCloseTo(-HORIZONTAL_MAX_TRAVEL, 2);
-      expect(state.velocity).toBe(0); // Motion halted
-      expect(state.time).toBeGreaterThan(11.0);
-      expect(state.time).toBeLessThan(14.0);
 
-      // Verify freezing: further steps do not advance time or modify state
+      // 1. The terminal state does NOT violate physical travel limits:
+      expect(Math.abs(state.displacement)).toBeLessThanOrEqual(HORIZONTAL_MAX_TRAVEL);
+      expect(Math.abs(state.displacement)).toBeCloseTo(HORIZONTAL_MAX_TRAVEL, 1);
+
+      // 2. Terminal velocity is NOT artificially reset to zero (represents terminated mathematical model, not a collision):
+      expect(Math.abs(state.velocity)).toBeGreaterThan(0.5);
+
+      // 3. Terminal acceleration is preserved:
+      expect(Number.isFinite(state.acceleration)).toBe(true);
+
+      // 4. Exceeded status remains explicit:
+      expect(state.apparatusStatus).toBe('exceeded');
+
+      // 5. Subsequent integration calls do not change the terminal state (frozen):
       const frozenTime = state.time;
       const frozenDisplacement = state.displacement;
+      const frozenVelocity = state.velocity;
+      const frozenAccel = state.acceleration;
       const nextState = stepForcedOscillatorRK4(state, spring, driver, dt);
+
       expect(nextState.time).toBe(frozenTime);
       expect(nextState.displacement).toBe(frozenDisplacement);
+      expect(nextState.velocity).toBe(frozenVelocity);
+      expect(nextState.acceleration).toBe(frozenAccel);
       expect(nextState.apparatusStatus).toBe('exceeded');
     });
 
@@ -995,30 +1015,90 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(transform.worldDrivingForceX).toBe(2.0); // points right
     });
 
-    it('computes automatic camera bounds for horizontal air track with full resonance framing', () => {
-      // Small amplitude (off-resonance A = 0.20 m)
-      const smallBounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, 0.40, 0.20);
-      expect(smallBounds.minX).toBe(-1.25); // wallWorldX - 0.25
-      expect(smallBounds.maxX).toBeCloseTo(-1.0 + 0.40 + 0.20 + 0.20 + 0.35, 4); // 0.15
-      expect(smallBounds.viewportWidth).toBeCloseTo((0.15 - (-1.25)) * 1.15, 4);
-      expect(smallBounds.centerY).toBe(0.0);
-
-      // Large amplitude (resonance A = 2.0 m)
-      const resBounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, 0.40, 2.0);
-      expect(resBounds.viewportWidth).toBeGreaterThan(smallBounds.viewportWidth);
-      expect(resBounds.centerX).toBeGreaterThan(smallBounds.centerX);
-      expect(resBounds.minX).toBe(-1.25); // wall remains fixed
-      expect(resBounds.maxX).toBeCloseTo(-1.0 + 0.40 + 2.0 + 0.20 + 0.35, 4); // 1.95
+    it('computes automatic camera bounds framing the full guide rail and oscillation excursion', () => {
+      // Guide rail extends 6.00 m from wall at wallWorldX = -1.0
+      // Physical apparatus span: minX = -1.25, maxX = 5.15 (rail end 5.00 + 0.15 buffer)
+      const bounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, HORIZONTAL_NATURAL_LENGTH, 2.0, HORIZONTAL_RAIL_LENGTH);
+      expect(bounds.minX).toBe(-1.25); // wallWorldX - 0.25
+      expect(bounds.maxX).toBe(5.15); // wallWorldX + 6.00 + 0.15
+      expect(bounds.viewportWidth).toBeCloseTo((5.15 - (-1.25)) * 1.15, 4); // 6.40 * 1.15 = 7.36
+      expect(bounds.centerX).toBeCloseTo(1.95, 4);
+      expect(bounds.centerY).toBe(0.0);
+      expect(bounds.cameraMinX).toBeCloseTo(-1.73, 4);
+      expect(bounds.cameraMaxX).toBeCloseTo(5.63, 4);
+      expect(bounds.paddingX).toBeCloseTo(0.48, 4);
     });
 
-    it('computes automatic camera bounds for revised horizontal apparatus with default L0_h = 2.50 m', () => {
-      // With default L0_h = 2.50 m and peak resonance excursion A = 2.0 m
-      const bounds = computeHorizontalAutoCameraBounds(-1.0, 0.0, HORIZONTAL_NATURAL_LENGTH, 2.0);
-      expect(bounds.minX).toBe(-1.25); // wallWorldX - 0.25
-      // maxX = wallWorldX + L0_h + A + blockWidth + margin = -1.0 + 2.50 + 2.00 + 0.20 + 0.35 = 4.05 m
-      expect(bounds.maxX).toBeCloseTo(4.05, 4);
-      expect(bounds.viewportWidth).toBeCloseTo((4.05 - (-1.25)) * 1.15, 4); // 5.30 * 1.15 = 6.095 m
-      expect(bounds.centerY).toBe(0.0);
+    it('verifies that the complete horizontal apparatus and mass at both displacement extremes fit inside camera bounds', () => {
+      const wallWorldX = 0.0;
+      const trackWorldY = 0.0;
+      const bounds = computeHorizontalAutoCameraBounds(
+        wallWorldX,
+        trackWorldY,
+        HORIZONTAL_NATURAL_LENGTH,
+        2.0,
+        HORIZONTAL_RAIL_LENGTH
+      );
+
+      // 1. Wall anchor and left bracket
+      expect(bounds.minX).toBe(-0.25); // wall bracket left edge
+      expect(bounds.cameraMinX).toBeLessThan(bounds.minX); // camera covers beyond left bracket
+      expect(bounds.minX - bounds.cameraMinX).toBeCloseTo(bounds.paddingX, 4);
+
+      // 2. Guide rail structure
+      const railStart = wallWorldX;
+      const railEnd = wallWorldX + HORIZONTAL_RAIL_LENGTH; // 6.00 m
+      expect(railStart).toBeGreaterThanOrEqual(bounds.minX);
+      expect(railEnd).toBeLessThanOrEqual(bounds.maxX);
+      expect(bounds.cameraMaxX).toBeGreaterThan(railEnd); // camera covers beyond rail end
+      expect(bounds.cameraMaxX - bounds.maxX).toBeCloseTo(bounds.paddingX, 4);
+
+      // 3. Equilibrium position
+      const xEq = wallWorldX + HORIZONTAL_NATURAL_LENGTH; // 2.50 m
+      expect(xEq).toBe(2.50);
+      expect(xEq).toBeGreaterThan(bounds.cameraMinX);
+      expect(xEq).toBeLessThan(bounds.cameraMaxX);
+
+      // 4. Extreme compression: mass at solid height x = -2.40 m
+      // Mass center is at 2.50 - 2.40 = 0.10 m. Block width = 0.20 m => left edge is at 0.00 m (the wall)
+      const xMinDisplacement = -HORIZONTAL_MAX_COMPRESSION; // -2.40 m
+      const minMassTransform = transformToHorizontalWorldCoordinates({
+        wallWorldX,
+        trackWorldY,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH,
+        displacement: xMinDisplacement,
+        velocity: 0,
+        acceleration: 0,
+        restoringForce: 25.0 * 2.40,
+      });
+      const massCenterMin = minMassTransform.worldPositionX; // 0.10 m
+      const massLeftEdgeMin = massCenterMin - 0.10; // 0.00 m
+      expect(massLeftEdgeMin).toBeCloseTo(0.00, 4);
+      expect(massLeftEdgeMin).toBeGreaterThan(bounds.cameraMinX); // fits with 0.73 m margin!
+
+      // 5. Extreme extension: mass at max operating length x = +3.00 m
+      // Mass center is at 2.50 + 3.00 = 5.50 m. Right edge is at 5.60 m.
+      const xMaxDisplacement = HORIZONTAL_MAX_EXTENSION; // +3.00 m
+      const maxMassTransform = transformToHorizontalWorldCoordinates({
+        wallWorldX,
+        trackWorldY,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH,
+        displacement: xMaxDisplacement,
+        velocity: 0,
+        acceleration: 0,
+        restoringForce: -25.0 * 3.00,
+      });
+      const massCenterMax = maxMassTransform.worldPositionX; // 5.50 m
+      const massRightEdgeMax = massCenterMax + 0.10; // 5.60 m
+      expect(massRightEdgeMax).toBeCloseTo(5.60, 4);
+      expect(massRightEdgeMax).toBeLessThan(bounds.cameraMaxX); // fits with 1.03 m margin!
+
+      // 6. Padding verification: exact 7.5% padding on each side (total 15% padding)
+      const physicalSpan = bounds.maxX - bounds.minX; // 6.40 m
+      expect(physicalSpan).toBeCloseTo(6.40, 4);
+      expect(bounds.paddingX).toBeCloseTo(physicalSpan * 0.075, 4); // 0.48 m
+      expect(bounds.viewportWidth).toBeCloseTo(physicalSpan * 1.15, 4); // 7.36 m
+      expect(bounds.cameraMaxX - bounds.cameraMinX).toBeCloseTo(bounds.viewportWidth, 4);
     });
   });
 });

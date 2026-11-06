@@ -1308,21 +1308,13 @@ export function stepForcedOscillatorRK4(
   const newPeak = Math.max(prevPeak, absDisplacement);
 
   if (absDisplacement > travelLimit) {
-    // Travel limit exceeded: stop simulation, clamp coordinates to limit, zero out velocity/accel
-    const clampedX = Math.sign(newX) * travelLimit;
+    // The prospective integration step to newX would exceed the physical travel limit.
+    // Terminate the simulation model: preserve the last valid physical state without
+    // fabricating a zero-velocity resting collision state, and set apparatusStatus = 'exceeded'.
     return {
-      time: newTime,
-      displacement: clampedX,
-      velocity: 0,
-      acceleration: 0,
-      drivingForce: drivingForceNow,
-      externalWork: newW,
-      dissipatedEnergy: newDiss,
-      kineticEnergy: 0,
-      effectivePotentialEnergy: 0.5 * k * clampedX * clampedX,
-      totalMechanicalEnergy: 0.5 * k * clampedX * clampedX,
+      ...state,
       apparatusStatus: 'exceeded',
-      peakDisplacement: Math.max(newPeak, travelLimit),
+      peakDisplacement: Math.max(state.peakDisplacement ?? Math.abs(x0), Math.abs(x0)),
     };
   }
 
@@ -1600,13 +1592,15 @@ export function transformToHorizontalWorldCoordinates(physical: {
 
 /**
  * Computes dynamic Camera2D viewport bounds for the horizontal air track apparatus.
- * Frames the wall anchor, guide track, and peak oscillation excursion with 15% visual padding.
+ * Frames the wall anchor bracket, guide track (6.0 m default), and peak oscillation excursion
+ * with 15% visual padding (7.5% margin on each side).
  */
 export function computeHorizontalAutoCameraBounds(
   wallWorldX: number,
   trackWorldY: number,
   naturalLength: number = HORIZONTAL_NATURAL_LENGTH,
-  peakAmplitude: number = 2.0
+  peakAmplitude: number = 2.0,
+  railLength: number = HORIZONTAL_RAIL_LENGTH
 ): {
   centerX: number;
   centerY: number;
@@ -1614,18 +1608,37 @@ export function computeHorizontalAutoCameraBounds(
   viewportHeight: number;
   minX: number;
   maxX: number;
+  cameraMinX: number;
+  cameraMaxX: number;
+  paddingX: number;
 } {
   const blockWidth = 0.20; // meters
-  const margin = 0.35; // meters for wall bracket, arrows, and labels
+  const wallBracketWidth = 0.25; // meters left of wallWorldX
+  const railEndStopWidth = 0.15; // meters beyond railLength
+  const labelMargin = 0.35; // meters for wall bracket, arrows, and labels
 
-  const minX = wallWorldX - 0.25; // includes wall mount bracket
-  const maxX = wallWorldX + naturalLength + peakAmplitude + blockWidth + margin;
+  // Left physical apparatus boundary: wall anchor mounting bracket
+  const minX = wallWorldX - wallBracketWidth;
 
-  const viewportWidth = (maxX - minX) * 1.15; // 15% padding
+  // Right physical apparatus boundary: must encompass BOTH the full guide rail structure
+  // AND any mass excursion with its block half-width and arrow annotations
+  const maxExcursionRight = wallWorldX + naturalLength + peakAmplitude + blockWidth / 2.0 + labelMargin;
+  const railEndRight = wallWorldX + railLength + railEndStopWidth;
+  const maxX = Math.max(railEndRight, maxExcursionRight);
+
+  // Total unpadded physical apparatus span
+  const physicalSpan = maxX - minX;
+
+  // Apply 15% visual padding (7.5% on left, 7.5% on right)
+  const paddingX = (physicalSpan * 0.15) / 2.0;
+  const viewportWidth = physicalSpan * 1.15;
   const centerX = (minX + maxX) / 2.0;
 
-  // Track height framing (16:9 aspect ratio target or minimum 1.2 m vertical viewport centered on track)
-  const viewportHeight = Math.max(1.2, viewportWidth * (9.0 / 16.0));
+  const cameraMinX = centerX - viewportWidth / 2.0;
+  const cameraMaxX = centerX + viewportWidth / 2.0;
+
+  // Track height framing (16:9 aspect ratio target or minimum 1.5 m vertical viewport centered on track)
+  const viewportHeight = Math.max(1.5, viewportWidth * (9.0 / 16.0));
   const centerY = trackWorldY;
 
   return {
@@ -1635,5 +1648,8 @@ export function computeHorizontalAutoCameraBounds(
     viewportHeight,
     minX,
     maxX,
+    cameraMinX,
+    cameraMaxX,
+    paddingX,
   };
 }
