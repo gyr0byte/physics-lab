@@ -32,6 +32,7 @@ import {
   HORIZONTAL_MAX_COMPRESSION,
   HORIZONTAL_MAX_EXTENSION,
   HORIZONTAL_MAX_TRAVEL,
+  HORIZONTAL_BLOCK_WIDTH,
   ForcedIntegrationState,
   PendulumState,
 } from '../../src/physics/SimpleHarmonicPhysics';
@@ -990,7 +991,9 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
 
     it('correctly maps horizontal air track physical coordinates to world coordinates', () => {
       // Wall mount at X = -1.5, track elevation at Y = 0.5
-      // Default L0_h = 2.50 m, displacement x = +0.25 m (stretched right)
+      // Default L0_h = 2.50 m, blockWidth = 0.20 m => equilibrium center = -1.5 + 2.50 + 0.10 = 1.10 m
+      // displacement x = +0.25 m (stretched right) => block center = 1.10 + 0.25 = 1.35 m
+      // spring length = 2.50 + 0.25 = 2.75 m => left face = -1.5 + 2.75 = 1.25 m
       // v = +1.2 m/s (moving right), a = -6.25 m/s² (accelerating left)
       // Restoring force F_s = -k·x = -25 * 0.25 = -6.25 N (points leftward)
       // Driving force F_drive = +2.0 N (points rightward)
@@ -1007,8 +1010,12 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
 
       expect(transform.worldWallX).toBe(-1.5);
       expect(transform.worldPositionY).toBe(0.5);
-      expect(transform.worldEquilibriumX).toBeCloseTo(1.00, 4); // -1.5 + 2.50
-      expect(transform.worldPositionX).toBeCloseTo(1.25, 4); // 1.00 + 0.25
+      expect(transform.worldEquilibriumX).toBeCloseTo(1.10, 4); // -1.5 + 2.50 + 0.10 (equilibrium center)
+      expect(transform.worldPositionX).toBeCloseTo(1.35, 4); // 1.10 + 0.25 (mass center)
+      expect(transform.worldAttachmentX).toBeCloseTo(1.25, 4); // -1.5 + 2.75 (spring attachment / left face)
+      expect(transform.worldBlockLeftX).toBeCloseTo(1.25, 4);
+      expect(transform.worldBlockRightX).toBeCloseTo(1.45, 4); // 1.25 + 0.20
+      expect(transform.springLength).toBeCloseTo(2.75, 4); // 2.50 + 0.25
       expect(transform.worldVelocityX).toBe(1.2);
       expect(transform.worldAccelerationX).toBe(-6.25);
       expect(transform.worldRestoringForceX).toBe(-6.25); // points left (towards wall)
@@ -1054,13 +1061,13 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(bounds.cameraMaxX - bounds.maxX).toBeCloseTo(bounds.paddingX, 4);
 
       // 3. Equilibrium position
-      const xEq = wallWorldX + HORIZONTAL_NATURAL_LENGTH; // 2.50 m
-      expect(xEq).toBe(2.50);
+      const xEq = wallWorldX + HORIZONTAL_NATURAL_LENGTH + HORIZONTAL_BLOCK_WIDTH / 2.0; // 2.60 m
+      expect(xEq).toBe(2.60);
       expect(xEq).toBeGreaterThan(bounds.cameraMinX);
       expect(xEq).toBeLessThan(bounds.cameraMaxX);
 
       // 4. Extreme compression: mass at solid height x = -2.40 m
-      // Mass center is at 2.50 - 2.40 = 0.10 m. Block width = 0.20 m => left edge is at 0.00 m (the wall)
+      // Spring length is 2.50 - 2.40 = 0.10 m. Block left face is at 0.10 m, center at 0.20 m, right edge at 0.30 m
       const xMinDisplacement = -HORIZONTAL_MAX_COMPRESSION; // -2.40 m
       const minMassTransform = transformToHorizontalWorldCoordinates({
         wallWorldX,
@@ -1071,13 +1078,13 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
         acceleration: 0,
         restoringForce: 25.0 * 2.40,
       });
-      const massCenterMin = minMassTransform.worldPositionX; // 0.10 m
-      const massLeftEdgeMin = massCenterMin - 0.10; // 0.00 m
-      expect(massLeftEdgeMin).toBeCloseTo(0.00, 4);
-      expect(massLeftEdgeMin).toBeGreaterThan(bounds.cameraMinX); // fits with 0.73 m margin!
+      expect(minMassTransform.springLength).toBeCloseTo(0.10, 4);
+      expect(minMassTransform.worldBlockLeftX).toBeCloseTo(0.10, 4); // does not touch wall at 0.00 m!
+      expect(minMassTransform.worldPositionX).toBeCloseTo(0.20, 4);
+      expect(minMassTransform.worldBlockLeftX).toBeGreaterThan(bounds.cameraMinX); // fits with 0.83 m margin!
 
       // 5. Extreme extension: mass at max operating length x = +3.00 m
-      // Mass center is at 2.50 + 3.00 = 5.50 m. Right edge is at 5.60 m.
+      // Spring length is 2.50 + 3.00 = 5.50 m. Block left face is at 5.50 m, center at 5.60 m, right edge at 5.70 m
       const xMaxDisplacement = HORIZONTAL_MAX_EXTENSION; // +3.00 m
       const maxMassTransform = transformToHorizontalWorldCoordinates({
         wallWorldX,
@@ -1088,10 +1095,9 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
         acceleration: 0,
         restoringForce: -25.0 * 3.00,
       });
-      const massCenterMax = maxMassTransform.worldPositionX; // 5.50 m
-      const massRightEdgeMax = massCenterMax + 0.10; // 5.60 m
-      expect(massRightEdgeMax).toBeCloseTo(5.60, 4);
-      expect(massRightEdgeMax).toBeLessThan(bounds.cameraMaxX); // fits with 1.03 m margin!
+      expect(maxMassTransform.springLength).toBeCloseTo(5.50, 4);
+      expect(maxMassTransform.worldBlockRightX).toBeCloseTo(5.70, 4); // on rail (5.70 m < 6.00 m)!
+      expect(maxMassTransform.worldBlockRightX).toBeLessThan(bounds.cameraMaxX); // fits with 0.93 m margin!
 
       // 6. Padding verification: exact 7.5% padding on each side (total 15% padding)
       const physicalSpan = bounds.maxX - bounds.minX; // 6.40 m
@@ -1099,6 +1105,84 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(bounds.paddingX).toBeCloseTo(physicalSpan * 0.075, 4); // 0.48 m
       expect(bounds.viewportWidth).toBeCloseTo(physicalSpan * 1.15, 4); // 7.36 m
       expect(bounds.cameraMaxX - bounds.cameraMinX).toBeCloseTo(bounds.viewportWidth, 4);
+    });
+
+    it('verifies horizontal spring attachment reference and mass block geometry at equilibrium and extremes', () => {
+      const wallWorldX = 0.0;
+      const trackWorldY = 0.0;
+
+      // 1. Equilibrium (x = 0):
+      const eqTransform = transformToHorizontalWorldCoordinates({
+        wallWorldX,
+        trackWorldY,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH, // 2.50 m
+        displacement: 0.0,
+        velocity: 0.0,
+        acceleration: 0.0,
+        restoringForce: 0.0,
+      });
+
+      // Item 1: Equilibrium spring length is exactly 2.50 m measured to the block's left attachment point:
+      expect(eqTransform.springLength).toBe(2.50);
+      expect(eqTransform.worldAttachmentX).toBe(2.50); // X_wall + 2.50
+      expect(eqTransform.worldBlockLeftX).toBe(2.50);
+
+      // Item 2: The equilibrium mass centre is 2.60 m:
+      expect(eqTransform.worldPositionX).toBe(2.60); // 2.50 + w_block / 2 = 2.60 m
+      expect(eqTransform.worldEquilibriumX).toBe(2.60);
+      expect(eqTransform.worldBlockRightX).toBe(2.70); // 2.60 + 0.10 = 2.70 m
+
+      // 2. Maximum compression (x = -2.40 m):
+      const compTransform = transformToHorizontalWorldCoordinates({
+        wallWorldX,
+        trackWorldY,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH,
+        displacement: -HORIZONTAL_MAX_COMPRESSION, // -2.40 m
+        velocity: 1.5,
+        acceleration: 60.0,
+        restoringForce: 25.0 * 2.40, // +60 N (opposes displacement, points rightward away from wall)
+      });
+
+      // Item 3: At maximum compression, spring length is 0.10 m and block does not touch the wall bracket:
+      expect(compTransform.springLength).toBeCloseTo(0.10, 6); // L_solid = 0.10 m
+      expect(compTransform.worldAttachmentX).toBeCloseTo(0.10, 6); // attaches at left face
+      expect(compTransform.worldBlockLeftX).toBeCloseTo(0.10, 6); // left face of block is at 0.10 m
+      expect(compTransform.worldPositionX).toBeCloseTo(0.20, 6); // mass center is at 0.20 m
+      expect(compTransform.worldBlockRightX).toBeCloseTo(0.30, 6); // right face is at 0.30 m
+      expect(compTransform.worldBlockLeftX).toBeGreaterThan(wallWorldX); // DOES NOT touch wall (0.10 m > 0.00 m)
+      expect(compTransform.worldBlockLeftX - wallWorldX).toBeCloseTo(SPRING_SOLID_HEIGHT, 6);
+
+      // 3. Maximum extension (x = +3.00 m):
+      const extTransform = transformToHorizontalWorldCoordinates({
+        wallWorldX,
+        trackWorldY,
+        naturalLength: HORIZONTAL_NATURAL_LENGTH,
+        displacement: HORIZONTAL_MAX_EXTENSION, // +3.00 m
+        velocity: -1.5,
+        acceleration: -75.0,
+        restoringForce: -25.0 * 3.00, // -75 N (opposes displacement, points leftward towards wall)
+      });
+
+      // Item 4: At maximum extension, spring length is 5.50 m and block remains on the rail:
+      expect(extTransform.springLength).toBeCloseTo(5.50, 6); // L_max_op = 5.50 m
+      expect(extTransform.worldAttachmentX).toBeCloseTo(5.50, 6);
+      expect(extTransform.worldBlockLeftX).toBeCloseTo(5.50, 6);
+      expect(extTransform.worldPositionX).toBeCloseTo(5.60, 6); // mass center at 5.60 m
+      expect(extTransform.worldBlockRightX).toBeCloseTo(5.70, 6); // right face at 5.70 m
+      const railEnd = wallWorldX + HORIZONTAL_RAIL_LENGTH; // 6.00 m
+      expect(extTransform.worldBlockRightX).toBeLessThan(railEnd); // remains on rail (5.70 m < 6.00 m)
+      expect(railEnd - extTransform.worldBlockRightX).toBeCloseTo(0.30, 6); // 0.30 m clearance before rail end
+
+      // Item 5: Horizontal force vectors and equations are unchanged:
+      expect(compTransform.worldRestoringForceX).toBeCloseTo(60.0, 6); // points right (+X) when compressed
+      expect(extTransform.worldRestoringForceX).toBeCloseTo(-75.0, 6); // points left (-X) when extended
+
+      // Item 6: Camera bounds contain the complete corrected apparatus at both extremes:
+      const bounds = computeHorizontalAutoCameraBounds(wallWorldX, trackWorldY, HORIZONTAL_NATURAL_LENGTH, 2.0);
+      expect(compTransform.worldBlockLeftX).toBeGreaterThan(bounds.cameraMinX);
+      expect(extTransform.worldBlockRightX).toBeLessThan(bounds.cameraMaxX);
+      expect(bounds.cameraMinX).toBeLessThan(bounds.minX);
+      expect(bounds.cameraMaxX).toBeGreaterThan(bounds.maxX);
     });
   });
 });

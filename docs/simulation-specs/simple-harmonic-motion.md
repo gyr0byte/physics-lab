@@ -405,23 +405,50 @@ A critical architectural requirement is distinguishing between the **one-dimensi
 #### 2. Horizontal Apparatus Coordinate System (1D Horizontal, Rightward-Positive):
 - **Origin ($X_{\text{wall}} = 0$):** Left-hand vertical wall anchor bracket.
 - **Orientation:** $+X$ points **rightward** along the guide track.
-- **Unstretched Spring Position:** $X = L_{0,h}$ ($L_{0,h} = 2.50\text{ m}$, independent from vertical spring).
-- **Equilibrium Coordinate:** $X_{\text{eq}} = X_{\text{wall}} + L_{0,h} = L_{0,h}$ (gravity has zero component along track).
+- **Spring Attachment & Geometry Reference:**
+  - The helical spring attaches between the rigid wall anchor ($X_{\text{wall}} = 0.00\text{ m}$) and the **left face** of the oscillating mass block of width $w_{\text{block}} = 0.20\text{ m}$.
+  - Instantaneous physical spring length:
+    $$L(x) = L_{0,h} + x(t)$$
+  - Spring attachment point (left face of block):
+    $$X_{\text{attachment}}(t) = X_{\text{block,left}}(t) = X_{\text{wall}} + L(x(t)) = X_{\text{wall}} + L_{0,h} + x(t)$$
+  - Center of mass block:
+    $$X_{\text{block,center}}(t) = X_{\text{attachment}}(t) + \frac{w_{\text{block}}}{2} = X_{\text{wall}} + L_{0,h} + \frac{w_{\text{block}}}{2} + x(t)$$
+  - Right face of mass block:
+    $$X_{\text{block,right}}(t) = X_{\text{attachment}}(t) + w_{\text{block}} = X_{\text{wall}} + L_{0,h} + w_{\text{block}} + x(t)$$
+- **Equilibrium Coordinates ($x = 0$):**
+  - Equilibrium spring length: $L(0) = L_{0,h} = 2.50\text{ m}$
+  - Equilibrium attachment / left face: $X_{\text{eq,left}} = X_{\text{wall}} + L_{0,h} = 2.50\text{ m}$
+  - Equilibrium mass center: $X_{\text{eq,center}} = X_{\text{wall}} + L_{0,h} + \frac{w_{\text{block}}}{2} = 0 + 2.50 + 0.10 = 2.60\text{ m}$
+  - Equilibrium right face: $X_{\text{eq,right}} = 2.70\text{ m}$
 - **Displacement from Equilibrium:**
-  $$x(t) = X(t) - X_{\text{eq}}$$
-  - $x > 0$: Mass is to the right of equilibrium (spring stretched).
-  - $x < 0$: Mass is to the left of equilibrium (spring compressed toward solid height $L_{\text{solid}} = 0.10\text{ m}$).
-- **Spring length at displacement $x$:** $L(x) = L_{0,h} + x$
-  - Compression limit: $L(x) \ge L_{\text{solid}} \iff x \ge -(L_{0,h} - L_{\text{solid}}) = -2.40\text{ m}$
-  - Extension limit: $L(x) \le L_{\max,\text{op}} \iff x \le L_{\max,\text{op}} - L_{0,h} = 3.00\text{ m}$
-  - Binding travel limit: $|x| \le 2.40\text{ m}$ (compression is the binding constraint)
+  $$x(t) = X_{\text{block,center}}(t) - X_{\text{eq,center}}$$
+  - $x > 0$: Block is displaced to the right of equilibrium (spring stretched).
+  - $x < 0$: Block is displaced to the left of equilibrium (spring compressed toward solid height $L_{\text{solid}} = 0.10\text{ m}$).
+- **Extreme Positions & Apparatus Clearance:**
+  - **Maximum Compression ($x = -2.40\text{ m}$):**
+    - Instantaneous spring length: $L = 2.50 - 2.40 = 0.10\text{ m} = L_{\text{solid}}$
+    - Attachment / left face: $X_{\text{block,left}} = 0.10\text{ m} > X_{\text{wall}} = 0.00\text{ m}$ (does NOT touch or collide with the wall bracket; exactly solid height clearance is maintained)
+    - Mass center: $X_{\text{block,center}} = 0.20\text{ m}$
+    - Right face: $X_{\text{block,right}} = 0.30\text{ m}$
+  - **Maximum Extension ($x = +3.00\text{ m}$):**
+    - Instantaneous spring length: $L = 2.50 + 3.00 = 5.50\text{ m} = L_{\max,\text{op}}$
+    - Attachment / left face: $X_{\text{block,left}} = 5.50\text{ m}$
+    - Mass center: $X_{\text{block,center}} = 5.60\text{ m}$
+    - Right face: $X_{\text{block,right}} = 5.70\text{ m} < X_{\text{rail,end}} = 6.00\text{ m}$ (safely remains on the guide rail with $0.30\text{ m}$ margin before the end stop)
+  - **Binding Travel Limit:** $|x| \le 2.40\text{ m}$ (governed by the solid height limit in compression).
 - **Physical Velocity & Acceleration:**
   $$v_{\text{horiz}}(t) = \dot{x}(t) \quad (\text{rightward-positive})$$
   $$a_{\text{horiz}}(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v_{\text{horiz}}(t) + \frac{F_{\text{ext}}(t)}{m}$$
 - **Physical Net Restoring Force:**
-  $$F_{\text{restore,horiz}} = -kx(t) \quad (\text{leftward when } x > 0)$$
-- **Apparatus Limit Enforcement:**
-  During time-domain integration, if $|x(t)| > 2.40\text{ m}$, the simulation halts with `apparatusStatus: 'exceeded'`. The theoretical resonance curve $A(\Omega)$ continues to report the mathematical singularity at undamped exact resonance independently.
+  $$F_{\text{restore,horiz}} = -kx(t) \quad (\text{leftward when } x > 0, \text{rightward when } x < 0)$$
+  - At $x = -2.40\text{ m}$: $F_{\text{restore}} = -25.0 \times (-2.40) = +60.0\text{ N}$ (points away from wall)
+  - At $x = +3.00\text{ m}$: $F_{\text{restore}} = -25.0 \times (+3.00) = -75.0\text{ N}$ (points towards wall)
+- **Apparatus Limit Enforcement & Terminal State Semantics:**
+  - During time-domain integration, if a step would exceed the physical travel limits ($x(t) < -2.40\text{ m}$ or $x(t) > +3.00\text{ m}$), the integration detects the boundary violation.
+  - The simulation freezes all subsequent integration and sets `apparatusStatus = 'exceeded'`.
+  - The last valid physical state $(t_0, x_0, v_0, a_0)$ is strictly preserved with its actual non-zero velocity and acceleration.
+  - The engine does NOT clamp displacement to the boundary nor fabricate a zero-velocity resting state, accurately representing a halted numerical model rather than an artificial inelastic collision.
+  - The theoretical resonance curve $A(\Omega)$ continues to report the mathematical steady-state solution independently.
 
 #### 3. Camera2D World Coordinate System Transformations:
 - **Vertical Apparatus to World:**
@@ -431,7 +458,10 @@ A critical architectural requirement is distinguishing between the **one-dimensi
   $$\vec{F}_{\text{restore,world}} = (0, +kx(t))$$
 - **Horizontal Apparatus to World:**
   $$\vec{P}_{\text{wall}} = (X_{\text{wall}}, Y_{\text{track}})$$
-  $$\vec{P}_{\text{block,world}}(t) = (X_{\text{wall}} + L_{0,h} + x(t), Y_{\text{track}})$$
+  $$\vec{P}_{\text{attachment,world}}(t) = (X_{\text{wall}} + L_{0,h} + x(t), Y_{\text{track}})$$
+  $$\vec{P}_{\text{block,center,world}}(t) = (X_{\text{wall}} + L_{0,h} + \frac{w_{\text{block}}}{2} + x(t), Y_{\text{track}})$$
+  $$\vec{P}_{\text{block,left,world}}(t) = \vec{P}_{\text{attachment,world}}(t)$$
+  $$\vec{P}_{\text{block,right,world}}(t) = (X_{\text{wall}} + L_{0,h} + w_{\text{block}} + x(t), Y_{\text{track}})$$
   $$\vec{V}_{\text{world}} = (v(t), 0)$$
   $$\vec{A}_{\text{world}} = (a(t), 0)$$
   $$\vec{F}_{\text{restore,world}} = (-kx(t), 0)$$
@@ -448,9 +478,11 @@ A critical architectural requirement is distinguishing between the **one-dimensi
    $$Y_{\text{bottom,world}} = Y_{\text{ceiling}} - (L_0 + \Delta l + A_{\max} + h_{\text{bob}} + 0.20\text{ m})$$
    $$\text{camera.setViewportHeight}((Y_{\text{top}} - Y_{\text{bottom}}) \times 1.15), \quad \text{camera.setCenter}(0.0, (Y_{\text{top}} + Y_{\text{bottom}})/2)$$
 2. **Horizontal Apparatus Viewport (Forced Oscillation & Resonance):**
-   Frames the wall anchor, linear air track ($L_{\text{rail}} = 6.0\text{ m}$), and full resonance excursion:
-   $$X_{\min,\text{world}} = X_{\text{wall}} - 0.25\text{ m} \quad (\text{includes wall mount})$$
-   $$X_{\max,\text{world}} = X_{\text{wall}} + L_{0,h} + A_{\max} + w_{\text{block}} + 0.35\text{ m}$$
+   Frames the wall anchor, linear air track ($L_{\text{rail}} = 6.0\text{ m}$), guide rail end stop, and full resonance excursion:
+   $$X_{\min,\text{world}} = X_{\text{wall}} - 0.25\text{ m} \quad (\text{includes wall mount bracket})$$
+   $$X_{\text{excursion,right}} = X_{\text{wall}} + L_{0,h} + w_{\text{block}} + A_{\max} + 0.35\text{ m}$$
+   $$X_{\text{rail,right}} = X_{\text{wall}} + L_{\text{rail}} + 0.15\text{ m}$$
+   $$X_{\max,\text{world}} = \max(X_{\text{rail,right}}, X_{\text{excursion,right}})$$
    $$\text{camera.setViewportWidth}((X_{\max} - X_{\min}) \times 1.15), \quad \text{camera.setCenter}((X_{\min} + X_{\max})/2, Y_{\text{track}})$$
 This guarantees that for both vertical free oscillation and horizontal forced resonance ($A \approx 2.0\text{ m}$), the entire apparatus is centered, unclipped, and rendered with 15% comfortable margin on smart TV displays.
 

@@ -290,10 +290,18 @@ export interface VerticalWorldTransform {
 export interface HorizontalWorldTransform {
   /** World X coordinate of rigid wall mount anchor */
   worldWallX: number;
-  /** World X coordinate of equilibrium position (wallX + L0) */
+  /** World X coordinate of equilibrium mass center (wallX + L0 + blockWidth / 2) */
   worldEquilibriumX: number;
+  /** World X coordinate of spring attachment point on the block's left face (wallX + L(x)) */
+  worldAttachmentX: number;
   /** World X coordinate of oscillating block center */
   worldPositionX: number;
+  /** World X coordinate of block's left face */
+  worldBlockLeftX: number;
+  /** World X coordinate of block's right face */
+  worldBlockRightX: number;
+  /** Instantaneous physical spring length in meters: L(x) = L0 + x */
+  springLength: number;
   /** World Y coordinate of horizontal track elevation */
   worldPositionY: number;
   /** World X component of velocity vector */
@@ -374,6 +382,17 @@ export const HORIZONTAL_MAX_TRAVEL = Math.min(
   HORIZONTAL_MAX_EXTENSION,
   HORIZONTAL_RAIL_LENGTH - HORIZONTAL_NATURAL_LENGTH
 );
+
+/**
+ * Width of the oscillating mass block on the horizontal air track in meters.
+ * The spring attaches to the left face of the block:
+ *   X_attachment(t) = X_wall + L(x) = X_wall + L0_h + x
+ * The block center is offset by half its width:
+ *   X_center(t) = X_attachment(t) + w_block / 2 = X_wall + L0_h + w_block / 2 + x
+ * At static equilibrium (x = 0):
+ *   X_eq,center = X_wall + L0_h + w_block / 2 = 0 + 2.50 + 0.10 = 2.60 m
+ */
+export const HORIZONTAL_BLOCK_WIDTH = 0.20;
 
 export const DEFAULT_SPRING_PARAMS: Required<SpringParams> = {
   mass: 1.0,
@@ -1540,15 +1559,19 @@ export function computeAutoCameraBounds(
  * Physical system:
  * - Rigid wall mount anchor at physical x = 0 (world coordinate (wallWorldX, trackWorldY))
  * - Rightward direction is positive (+X) along the air track
- * - Static equilibrium at X_eq = wallWorldX + L0
- * - Displacement x = X - X_eq
+ * - Spring of natural length L0 attaches between wall anchor and the left face of the block
+ * - Instantaneous spring length: L(x) = L0 + x
+ * - Left face of mass block: X_left = wallWorldX + L(x) = wallWorldX + L0 + x
+ * - Center of mass block: X_center = X_left + blockWidth / 2 = wallWorldX + L0 + blockWidth / 2 + x
+ * - Static equilibrium of mass center (x = 0): X_eq = wallWorldX + L0 + blockWidth / 2
  *
  * World system (Camera2D):
  * - Rightward direction is positive (+X)
  * - Upward direction is positive (+Y)
  * - Wall mount anchor at (wallWorldX, trackWorldY)
- * - World Equilibrium: X_eq = wallWorldX + L0
- * - World Block Center: X_block = X_eq + x
+ * - Spring attachment point at (worldAttachmentX, trackWorldY)
+ * - Block center at (worldPositionX, trackWorldY)
+ * - Block boundaries at [worldBlockLeftX, worldBlockRightX]
  * - World Velocity Vector: (v_phys, 0)
  * - World Acceleration Vector: (a_phys, 0)
  * - World Restoring Force Vector: (-k·x, 0) (points leftward towards wall when x > 0)
@@ -1563,6 +1586,7 @@ export function transformToHorizontalWorldCoordinates(physical: {
   acceleration: number;
   restoringForce: number;
   drivingForce?: number;
+  blockWidth?: number;
 }): HorizontalWorldTransform {
   const {
     wallWorldX,
@@ -1573,15 +1597,29 @@ export function transformToHorizontalWorldCoordinates(physical: {
     acceleration,
     restoringForce,
     drivingForce = 0,
+    blockWidth = HORIZONTAL_BLOCK_WIDTH,
   } = physical;
 
-  const worldEquilibriumX = wallWorldX + naturalLength;
-  const worldPositionX = worldEquilibriumX + displacement;
+  // Spring extends from wall anchor to left attachment face of mass block: L(x) = L0 + x
+  const springLength = naturalLength + displacement;
+
+  // Attachment point on the left face of the block
+  const worldAttachmentX = wallWorldX + springLength;
+  const worldBlockLeftX = worldAttachmentX;
+  const worldPositionX = worldBlockLeftX + blockWidth / 2.0;
+  const worldBlockRightX = worldBlockLeftX + blockWidth;
+
+  // Static equilibrium mass center (at x = 0)
+  const worldEquilibriumX = wallWorldX + naturalLength + blockWidth / 2.0;
 
   return {
     worldWallX: wallWorldX,
     worldEquilibriumX,
+    worldAttachmentX,
     worldPositionX,
+    worldBlockLeftX,
+    worldBlockRightX,
+    springLength,
     worldPositionY: trackWorldY,
     worldVelocityX: velocity,
     worldAccelerationX: acceleration,
@@ -1621,8 +1659,9 @@ export function computeHorizontalAutoCameraBounds(
   const minX = wallWorldX - wallBracketWidth;
 
   // Right physical apparatus boundary: must encompass BOTH the full guide rail structure
-  // AND any mass excursion with its block half-width and arrow annotations
-  const maxExcursionRight = wallWorldX + naturalLength + peakAmplitude + blockWidth / 2.0 + labelMargin;
+  // AND any mass excursion with its full block width and arrow annotations:
+  // X_right_edge = X_wall + L0 + blockWidth/2 + peakAmplitude + blockWidth/2 = X_wall + L0 + blockWidth + peakAmplitude
+  const maxExcursionRight = wallWorldX + naturalLength + blockWidth + peakAmplitude + labelMargin;
   const railEndRight = wallWorldX + railLength + railEndStopWidth;
   const maxX = Math.max(railEndRight, maxExcursionRight);
 
