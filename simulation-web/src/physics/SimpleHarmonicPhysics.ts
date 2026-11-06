@@ -6,7 +6,7 @@
  *
  * Features:
  * 1. Mode 1: Free Oscillation (Primary: Vertical Spring-Mass; Secondary: Simple Pendulum & Horizontal Spring)
- * 2. Mode 2: Damped Oscillation (Underdamped analytical solution, exponential envelope, energy dissipation)
+ * 2. Mode 2: Damped Oscillation (Exact analytical solutions for underdamped, critically damped, and overdamped regimes)
  * 3. Mode 3: Forced Oscillation (Time-domain RK4 integration with external work & dissipation tracking)
  * 4. Mode 4: Mechanical Resonance (Analytical frequency response A(Ω), atan2 phase lag, displacement peak condition)
  *
@@ -49,6 +49,18 @@ export interface SpringParams {
 }
 
 /**
+ * Result of validating spring parameters.
+ */
+export interface SpringValidationResult {
+  /** Whether the configuration is physically valid and within apparatus bounds */
+  valid: boolean;
+  /** List of explicit error descriptions if validation failed */
+  errors: string[];
+  /** Calculated static elongation Δl = mg/k if parameters are valid numbers, else null */
+  staticElongation: number | null;
+}
+
+/**
  * Parameters for simple pendulum oscillation.
  */
 export interface PendulumParams {
@@ -68,7 +80,7 @@ export interface PendulumParams {
 export interface ForcedDriverParams {
   /** Amplitude of driving force in Newtons (F0 >= 0) */
   driverForce: number;
-  /** Angular frequency of driving force in rad/s (Ω > 0) */
+  /** Angular frequency of driving force in rad/s (Ω >= 0; Ω = 0 represents static load) */
   drivingFrequency: number;
 }
 
@@ -85,6 +97,11 @@ export interface SHMFrequencies {
 }
 
 /**
+ * Physical damping classification.
+ */
+export type DampingRegime = 'undamped' | 'underdamped' | 'critically-damped' | 'overdamped';
+
+/**
  * Frequencies and damping properties for damped oscillator.
  */
 export interface DampedFrequencies {
@@ -96,13 +113,15 @@ export interface DampedFrequencies {
   gamma: number;
   /** Dimensionless damping ratio (ζ = γ / ω0) */
   dampingRatio: number;
+  /** Physical regime classification */
+  regime: DampingRegime;
   /** Whether the system is strictly underdamped (γ < ω0) */
   isUnderdamped: boolean;
-  /** Damped angular frequency in rad/s (ωd = √(ω0² - γ²)) */
+  /** Damped angular frequency in rad/s (ωd = √(ω0² - γ²), or 0 if not underdamped) */
   omegaD: number;
-  /** Damped oscillation period in seconds (Td = 2π / ωd) */
+  /** Damped oscillation period in seconds (Td = 2π / ωd, or Infinity if not underdamped) */
   periodD: number;
-  /** Damped frequency in Hertz (fd = ωd / 2π) */
+  /** Damped frequency in Hertz (fd = ωd / 2π, or 0 if not underdamped) */
   frequencyD: number;
 }
 
@@ -132,6 +151,8 @@ export interface SHMState {
   dissipatedEnergy: number;
   /** Theoretical upper amplitude envelope at time t in meters */
   envelope: number;
+  /** Damping regime classification */
+  regime: DampingRegime;
 }
 
 /**
@@ -167,10 +188,10 @@ export interface ResonanceCurvePoint {
   drivingFrequencyHz: number;
   /** Theoretical steady-state amplitude in meters (A(Ω)) */
   amplitude: number;
-  /** Phase lag in radians (δ ∈ [0, π]) */
-  phaseLagRad: number;
-  /** Phase lag in degrees (δ ∈ [0°, 180°]) */
-  phaseLagDeg: number;
+  /** Phase lag in radians (δ ∈ [0, π], or null if undefined at undamped resonance) */
+  phaseLagRad: number | null;
+  /** Phase lag in degrees (δ ∈ [0°, 180°], or null if undefined at undamped resonance) */
+  phaseLagDeg: number | null;
 }
 
 /**
@@ -200,7 +221,7 @@ export interface ForcedIntegrationState {
 }
 
 /**
- * State of simple pendulum (both small-angle and exact nonlinear).
+ * State of simple pendulum (supporting both linearized SHM and exact nonlinear modes).
  */
 export interface PendulumState {
   /** Elapsed simulation time in seconds */
@@ -217,14 +238,18 @@ export interface PendulumState {
   linearDisplacement: number;
   /** Linear velocity in m/s (v = L·ω) */
   linearVelocity: number;
-  /** Gravitational restoring torque in N·m (τ = -m·g·L·sinθ) */
+  /** Mode-appropriate restoring torque in N·m (-mgLθ for small-angle, -mgLsinθ for exact) */
   restoringTorque: number;
   /** Kinetic energy in Joules (K = 0.5·m·L²·ω²) */
   kineticEnergy: number;
-  /** Gravitational potential energy relative to lowest point in Joules (U = m·g·L·(1 - cosθ)) */
+  /** Mode-appropriate potential energy in Joules */
   potentialEnergy: number;
-  /** Total mechanical energy in Joules (E = K + U) */
+  /** Total conserved mechanical energy in Joules (E = K + U) */
   totalEnergy: number;
+  /** Explicit linearized potential energy (0.5·m·g·L·θ²) */
+  approximatePotentialEnergy?: number;
+  /** Explicit exact gravitational potential energy (m·g·L·(1 - cosθ)) */
+  exactPotentialEnergy?: number;
 }
 
 /**
@@ -265,63 +290,126 @@ export const DEFAULT_PENDULUM_PARAMS: Required<PendulumParams> = {
   initialAngleRad: (12.0 * Math.PI) / 180.0, // 12 degrees
 };
 
+/**
+ * Normal forced-oscillation preset: includes finite damping (b = 0.20 N·s/m)
+ * to ensure a realistic, finite steady-state amplitude away from the undamped singularity.
+ */
+export const DEFAULT_FORCED_SPRING_PARAMS: Required<SpringParams> = {
+  mass: 1.0,
+  springConstant: 25.0,
+  naturalLength: 0.40,
+  gravity: 9.80,
+  dampingCoefficient: 0.20,
+  initialDisplacement: 0.0,
+};
+
 export const DEFAULT_DRIVER_PARAMS: ForcedDriverParams = {
   driverForce: 2.0,
-  drivingFrequency: 5.0, // matches default ω0 = √(25/1) = 5.0 rad/s
+  drivingFrequency: 4.0, // 4.0 rad/s (off-resonance, natural frequency is 5.0 rad/s)
+};
+
+/**
+ * Undamped resonance preset: intentionally demonstrates the unbounded theoretical singularity (A -> Infinity)
+ * with an explicit warning banner in the UI.
+ */
+export const UNDAMPED_RESONANCE_PRESET: { spring: Required<SpringParams>; driver: ForcedDriverParams } = {
+  spring: {
+    mass: 1.0,
+    springConstant: 25.0,
+    naturalLength: 0.40,
+    gravity: 9.80,
+    dampingCoefficient: 0.0,
+    initialDisplacement: 0.0,
+  },
+  driver: {
+    driverForce: 2.0,
+    drivingFrequency: 5.0, // Exact resonance Ω = ω0 = 5.0 rad/s
+  },
 };
 
 /** Safety clamp for static elongation to maintain physical classroom scale (meters) */
 export const MAX_STATIC_ELONGATION = 1.80;
+
+/**
+ * Maximum possible damping ratio across the entire valid parameter envelope:
+ * m in [0.20, 3.00] kg, k in [10.0, 100.0] N/m, b in [0.0, 1.00] N·s/m
+ * ζ_max = b_max / (2·√(k_min · m_min)) = 1.0 / (2·√(10.0 · 0.20)) = 1 / (2·√2) ≈ 0.353553
+ *
+ * Because 0.3536 < 1/√2 ≈ 0.7071, every valid parameter combination in the classroom
+ * envelope is guaranteed to be strictly underdamped and have a displacement resonance peak.
+ */
+export const MAX_ENVELOPE_DAMPING_RATIO = 1.0 / (2.0 * Math.sqrt(10.0 * 0.20));
 
 // ============================================================================
 // Validation & Core Statics
 // ============================================================================
 
 /**
- * Validates and clamps spring parameters to ensure physical apparatus validity.
+ * Validates spring parameters against physical and apparatus safety constraints.
  *
  * Rules:
- * - m > 0, k > 0, g > 0, b >= 0, L0 > 0.
- * - Static elongation Δl = m·g / k clamped to MAX_STATIC_ELONGATION (1.80 m).
- * - Initial displacement |x0| clamped to 0.85·(L0 + Δl) to prevent striking the ceiling bracket.
+ * - Rejects non-finite numbers (NaN, Infinity, -Infinity) for any parameter.
+ * - Rejects mass <= 0.
+ * - Rejects springConstant <= 0.
+ * - Rejects dampingCoefficient < 0.
+ * - Rejects naturalLength <= 0.
+ * - Rejects gravity <= 0.
+ * - Strictly preserves the physical relationship: Δl = (m · g) / k.
+ * - Rejects configurations where Δl > MAX_STATIC_ELONGATION (1.80 m).
+ * - Rejects configurations where initial displacement exceeds ceiling clearance: |x0| > 0.85·(L0 + Δl).
  */
-export function validateSpringParams(params: SpringParams): {
-  valid: boolean;
-  clampedParams: Required<SpringParams>;
-  warning?: string;
-} {
-  const mass = Math.max(0.1, params.mass);
-  const springConstant = Math.max(1.0, params.springConstant);
-  const naturalLength = Math.max(0.1, params.naturalLength ?? DEFAULT_SPRING_PARAMS.naturalLength);
-  const gravity = Math.max(0.1, params.gravity ?? DEFAULT_SPRING_PARAMS.gravity);
-  const dampingCoefficient = Math.max(0.0, params.dampingCoefficient ?? 0.0);
+export function validateSpringParams(params: SpringParams): SpringValidationResult {
+  const errors: string[] = [];
 
-  let deltaL = (mass * gravity) / springConstant;
-  let warning: string | undefined;
-
-  if (deltaL > MAX_STATIC_ELONGATION) {
-    warning = `Static elongation (${deltaL.toFixed(2)} m) exceeds safe apparatus bound (1.80 m). Clamping to 1.80 m.`;
-    deltaL = MAX_STATIC_ELONGATION;
+  // 1. Finite number and positivity checks
+  if (!Number.isFinite(params.mass) || params.mass <= 0) {
+    errors.push(`Invalid mass: must be a positive finite number (received: ${params.mass}).`);
+  }
+  if (!Number.isFinite(params.springConstant) || params.springConstant <= 0) {
+    errors.push(`Invalid spring constant: must be a positive finite number (received: ${params.springConstant}).`);
+  }
+  if (params.naturalLength !== undefined && (!Number.isFinite(params.naturalLength) || params.naturalLength <= 0)) {
+    errors.push(`Invalid natural length: must be a positive finite number (received: ${params.naturalLength}).`);
+  }
+  if (params.gravity !== undefined && (!Number.isFinite(params.gravity) || params.gravity <= 0)) {
+    errors.push(`Invalid gravity: must be a positive finite number (received: ${params.gravity}).`);
+  }
+  if (params.dampingCoefficient !== undefined && (!Number.isFinite(params.dampingCoefficient) || params.dampingCoefficient < 0)) {
+    errors.push(`Invalid damping coefficient: must be a non-negative finite number (received: ${params.dampingCoefficient}).`);
+  }
+  if (!Number.isFinite(params.initialDisplacement)) {
+    errors.push(`Invalid initial displacement: must be a finite number (received: ${params.initialDisplacement}).`);
   }
 
-  // Maximum allowed amplitude before mass hits ceiling clamp
-  const maxAllowedAmplitude = 0.85 * (naturalLength + deltaL);
-  const initialDisplacement = Math.min(
-    Math.max(params.initialDisplacement, -maxAllowedAmplitude),
-    maxAllowedAmplitude
-  );
+  // If basic numerical properties failed, fail immediately without calculating derived quantities
+  if (errors.length > 0) {
+    return { valid: false, errors, staticElongation: null };
+  }
+
+  const gravity = params.gravity ?? DEFAULT_SPRING_PARAMS.gravity;
+  const naturalLength = params.naturalLength ?? DEFAULT_SPRING_PARAMS.naturalLength;
+
+  // 2. Strict physical elongation check
+  const deltaL = (params.mass * gravity) / params.springConstant;
+
+  if (deltaL > MAX_STATIC_ELONGATION) {
+    errors.push(
+      `Static elongation (${deltaL.toFixed(2)} m) exceeds maximum allowable apparatus limit of ${MAX_STATIC_ELONGATION} m.`
+    );
+  }
+
+  // 3. Ceiling clearance check
+  const maxAllowedDisplacement = 0.85 * (naturalLength + deltaL);
+  if (Math.abs(params.initialDisplacement) > maxAllowedDisplacement) {
+    errors.push(
+      `Initial displacement magnitude (${Math.abs(params.initialDisplacement).toFixed(2)} m) exceeds ceiling clearance limit (${maxAllowedDisplacement.toFixed(2)} m).`
+    );
+  }
 
   return {
-    valid: warning === undefined,
-    clampedParams: {
-      mass,
-      springConstant,
-      naturalLength,
-      gravity,
-      dampingCoefficient,
-      initialDisplacement,
-    },
-    warning,
+    valid: errors.length === 0,
+    errors,
+    staticElongation: errors.length === 0 ? deltaL : null,
   };
 }
 
@@ -380,8 +468,7 @@ export function computePendulumFrequencies(
  * Computes damping properties and damped frequencies:
  *   γ = b / (2m)
  *   ζ = γ / ω0
- *   ωd = √(ω0² - γ²) (when γ < ω0)
- *   Td = 2π / ωd
+ *   Classifies regime: 'undamped' | 'underdamped' | 'critically-damped' | 'overdamped'
  */
 export function computeDampedFrequencies(
   mass: number,
@@ -395,6 +482,7 @@ export function computeDampedFrequencies(
       period0: 0,
       gamma: 0,
       dampingRatio: 0,
+      regime: 'undamped',
       isUnderdamped: false,
       omegaD: 0,
       periodD: Infinity,
@@ -404,35 +492,66 @@ export function computeDampedFrequencies(
 
   const gamma = dampingCoefficient / (2.0 * mass);
   const dampingRatio = gamma / omega0;
-  const isUnderdamped = gamma < omega0;
 
-  if (!isUnderdamped) {
+  if (dampingCoefficient === 0) {
+    return {
+      omega0,
+      period0,
+      gamma: 0,
+      dampingRatio: 0,
+      regime: 'undamped',
+      isUnderdamped: true,
+      omegaD: omega0,
+      periodD: period0,
+      frequencyD: 1.0 / period0,
+    };
+  }
+
+  const epsilon = 1e-12;
+
+  if (gamma < omega0 - epsilon) {
+    // Strictly underdamped
+    const omegaD = Math.sqrt(omega0 * omega0 - gamma * gamma);
+    const periodD = (2.0 * Math.PI) / omegaD;
+    const frequencyD = 1.0 / periodD;
     return {
       omega0,
       period0,
       gamma,
       dampingRatio,
+      regime: 'underdamped',
+      isUnderdamped: true,
+      omegaD,
+      periodD,
+      frequencyD,
+    };
+  } else if (Math.abs(gamma - omega0) <= epsilon) {
+    // Critically damped (ζ = 1)
+    return {
+      omega0,
+      period0,
+      gamma,
+      dampingRatio: 1.0,
+      regime: 'critically-damped',
+      isUnderdamped: false,
+      omegaD: 0,
+      periodD: Infinity,
+      frequencyD: 0,
+    };
+  } else {
+    // Overdamped (ζ > 1)
+    return {
+      omega0,
+      period0,
+      gamma,
+      dampingRatio,
+      regime: 'overdamped',
       isUnderdamped: false,
       omegaD: 0,
       periodD: Infinity,
       frequencyD: 0,
     };
   }
-
-  const omegaD = Math.sqrt(omega0 * omega0 - gamma * gamma);
-  const periodD = (2.0 * Math.PI) / omegaD;
-  const frequencyD = 1.0 / periodD;
-
-  return {
-    omega0,
-    period0,
-    gamma,
-    dampingRatio,
-    isUnderdamped: true,
-    omegaD,
-    periodD,
-    frequencyD,
-  };
 }
 
 // ============================================================================
@@ -473,25 +592,35 @@ export function computeIdealSpringState(params: SpringParams, time: number): SHM
     totalMechanicalEnergy,
     dissipatedEnergy: 0,
     envelope: Math.abs(A),
+    regime: 'undamped',
   };
 }
 
 // ============================================================================
-// Mode 2: Damped Oscillation
+// Mode 2: Damped Oscillation (Underdamped, Critical, Overdamped)
 // ============================================================================
 
 /**
- * Computes exact analytical state of an underdamped oscillator released from rest (x(0) = A, v(0) = 0):
+ * Computes exact analytical state of a damped oscillator released from rest (x(0) = A, v(0) = 0).
  *
- * To satisfy v(0) = 0, the analytical solution requires the phase cross-term:
- *   x(t) = A · e^(-γ·t) · [cos(ωd·t) + (γ / ωd)·sin(ωd·t)]
- *   v(t) = -(A · ω0² / ωd) · e^(-γ·t) · sin(ωd·t)
- *   a(t) = -ω0² · x(t) - 2γ · v(t)
- *   Envelope: ± A · (ω0 / ωd) · e^(-γ·t)
+ * Implements mathematically exact solutions satisfying both initial conditions (x(0) = A, v(0) = 0)
+ * and the equation of motion (m·x'' + b·x' + k·x = 0):
  *
- * Mechanical energy dissipation:
- *   E(t) = 0.5·m·v² + 0.5·k·x²
- *   E_diss = E(0) - E(t) = 0.5·k·A² - E(t)
+ * 1. Underdamped (γ < ω0):
+ *    x(t) = A · e^(-γt) · [cos(ωd·t) + (γ/ωd)·sin(ωd·t)]
+ *    v(t) = -(A·ω0²/ωd) · e^(-γt) · sin(ωd·t)
+ *    a(t) = -ω0²·x(t) - 2γ·v(t)
+ *
+ * 2. Critically Damped (γ = ω0):
+ *    x(t) = A · (1 + γt) · e^(-γt)
+ *    v(t) = -γ²·A·t · e^(-γt) = -ω0²·A·t · e^(-ω0t)
+ *    a(t) = γ²·A·(γt - 1) · e^(-γt) = -ω0²·x(t) - 2γ·v(t)
+ *
+ * 3. Overdamped (γ > ω0):
+ *    Let β = √(γ² - ω0²):
+ *    x(t) = A · e^(-γt) · [cosh(βt) + (γ/β)·sinh(βt)]
+ *    v(t) = -(A·ω0²/β) · e^(-γt) · sinh(βt)
+ *    a(t) = -ω0²·x(t) - 2γ·v(t)
  */
 export function computeDampedSpringState(params: SpringParams, time: number): SHMState {
   const b = params.dampingCoefficient ?? 0;
@@ -501,47 +630,43 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
 
   const { mass, springConstant, initialDisplacement: A } = params;
   const dampedFreq = computeDampedFrequencies(mass, springConstant, b);
+  const { omega0, gamma, regime } = dampedFreq;
 
-  if (!dampedFreq.isUnderdamped) {
-    // Overdamped or critically damped fallback (not primary CDC lab model)
-    const gamma = dampedFreq.gamma;
-    const decay = Math.exp(-gamma * time);
-    const displacement = A * decay;
-    const velocity = -gamma * A * decay;
-    const acceleration = gamma * gamma * A * decay;
-    const kineticEnergy = 0.5 * mass * velocity * velocity;
-    const effectivePotentialEnergy = 0.5 * springConstant * displacement * displacement;
-    const totalMechanicalEnergy = kineticEnergy + effectivePotentialEnergy;
-    const initialEnergy = 0.5 * springConstant * A * A;
+  const initialMechanicalEnergy = 0.5 * springConstant * A * A;
+  let displacement: number;
+  let velocity: number;
+  let acceleration: number;
+  let envelope: number;
 
-    return {
-      time,
-      displacement,
-      velocity,
-      acceleration,
-      restoringForce: -springConstant * displacement,
-      dampingForce: -b * velocity,
-      kineticEnergy,
-      effectivePotentialEnergy,
-      totalMechanicalEnergy,
-      dissipatedEnergy: Math.max(0, initialEnergy - totalMechanicalEnergy),
-      envelope: Math.abs(A) * decay,
-    };
+  if (regime === 'underdamped') {
+    const { omegaD } = dampedFreq;
+    const expDecay = Math.exp(-gamma * time);
+    const cosTerm = Math.cos(omegaD * time);
+    const sinTerm = Math.sin(omegaD * time);
+
+    displacement = A * expDecay * (cosTerm + (gamma / omegaD) * sinTerm);
+    velocity = -((A * omega0 * omega0) / omegaD) * expDecay * sinTerm;
+    acceleration = -omega0 * omega0 * displacement - 2.0 * gamma * velocity;
+    envelope = Math.abs(A) * (omega0 / omegaD) * expDecay;
+  } else if (regime === 'critically-damped') {
+    const expDecay = Math.exp(-gamma * time);
+
+    displacement = A * (1.0 + gamma * time) * expDecay;
+    velocity = -gamma * gamma * A * time * expDecay;
+    acceleration = gamma * gamma * A * (gamma * time - 1.0) * expDecay;
+    envelope = Math.abs(displacement);
+  } else {
+    // Overdamped
+    const beta = Math.sqrt(gamma * gamma - omega0 * omega0);
+    const expDecay = Math.exp(-gamma * time);
+    const coshTerm = Math.cosh(beta * time);
+    const sinhTerm = Math.sinh(beta * time);
+
+    displacement = A * expDecay * (coshTerm + (gamma / beta) * sinhTerm);
+    velocity = -((A * omega0 * omega0) / beta) * expDecay * sinhTerm;
+    acceleration = -omega0 * omega0 * displacement - 2.0 * gamma * velocity;
+    envelope = Math.abs(displacement);
   }
-
-  const { omega0, gamma, omegaD } = dampedFreq;
-  const expDecay = Math.exp(-gamma * time);
-  const cosTerm = Math.cos(omegaD * time);
-  const sinTerm = Math.sin(omegaD * time);
-
-  // Exact position satisfying x(0) = A and v(0) = 0
-  const displacement = A * expDecay * (cosTerm + (gamma / omegaD) * sinTerm);
-
-  // Exact velocity derivative satisfying v(0) = 0
-  const velocity = -((A * omega0 * omega0) / omegaD) * expDecay * sinTerm;
-
-  // Exact acceleration satisfying equation of motion: a = -ω0²x - 2γv
-  const acceleration = -omega0 * omega0 * displacement - 2.0 * gamma * velocity;
 
   const restoringForce = -springConstant * displacement;
   const dampingForce = -b * velocity;
@@ -549,11 +674,7 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
   const kineticEnergy = 0.5 * mass * velocity * velocity;
   const effectivePotentialEnergy = 0.5 * springConstant * displacement * displacement;
   const totalMechanicalEnergy = kineticEnergy + effectivePotentialEnergy;
-  const initialEnergy = 0.5 * springConstant * A * A;
-  const dissipatedEnergy = Math.max(0, initialEnergy - totalMechanicalEnergy);
-
-  // Theoretical upper envelope: A · (ω0 / ωd) · e^(-γt)
-  const envelope = Math.abs(A) * (omega0 / omegaD) * expDecay;
+  const dissipatedEnergy = Math.max(0, initialMechanicalEnergy - totalMechanicalEnergy);
 
   return {
     time,
@@ -567,6 +688,7 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
     totalMechanicalEnergy,
     dissipatedEnergy,
     envelope,
+    regime,
   };
 }
 
@@ -578,7 +700,8 @@ export function computeDampedSpringState(params: SpringParams, time: number): SH
  * Computes theoretical steady-state amplitude A(Ω):
  *   A(Ω) = (F0 / m) / √((ω0² - Ω²)² + 4γ²Ω²)
  *
- * Engineering Rules:
+ * Rules:
+ * - At zero frequency (Ω = 0): returns static deflection A(0) = F0 / k.
  * - If b = 0 and |Ω - ω0| < 1e-12: returns Infinity (undamped resonance divergence).
  * - Never returns a finite steady-state value at exact undamped resonance.
  */
@@ -588,10 +711,17 @@ export function computeSteadyStateAmplitude(
 ): number {
   const { mass, springConstant } = params;
   const b = params.dampingCoefficient ?? 0;
-  const { driverForce: F0, drivingFrequency: Omega } = driver;
+  const { driverForce: F0, drivingFrequency: rawOmega } = driver;
 
-  if (mass <= 0 || springConstant <= 0 || F0 < 0 || Omega <= 0) {
+  if (mass <= 0 || springConstant <= 0 || F0 < 0) {
     return 0;
+  }
+
+  const Omega = Math.abs(rawOmega);
+
+  // Static load at zero frequency: F = k·x => x = F0 / k
+  if (Omega === 0) {
+    return F0 / springConstant;
   }
 
   const { omega0 } = computeSpringNaturalFrequencies(mass, springConstant);
@@ -614,23 +744,25 @@ export function computeSteadyStateAmplitude(
  * Computes theoretical steady-state phase lag δ(Ω) using two-argument atan2:
  *   δ = atan2(2γΩ, ω0² - Ω²)
  *
- * Returns δ ∈ [0, π] radians:
- * - Low frequency (Ω << ω0): δ ≈ 0 rad (in-phase)
- * - Resonance (Ω = ω0): δ = π/2 rad (90° lag)
- * - High frequency (Ω >> ω0): δ → π rad (180° lag / anti-phase)
+ * Returns δ ∈ [0, π] radians, or null if undefined at exact undamped resonance:
+ * - At b = 0 and Ω = ω0: returns null (phase is undefined because no finite steady state exists).
+ * - At b = 0, Ω < ω0: returns 0 rad (in-phase).
+ * - At b = 0, Ω > ω0: returns π rad (anti-phase).
+ * - At b > 0 and Ω = ω0: returns π/2 rad (exact 90° lag).
  */
-export function computePhaseLag(params: SpringParams, drivingFrequency: number): number {
+export function computePhaseLag(params: SpringParams, drivingFrequency: number): number | null {
   const { mass, springConstant } = params;
   const b = params.dampingCoefficient ?? 0;
-  const Omega = drivingFrequency;
+  const Omega = Math.abs(drivingFrequency);
 
   const { omega0 } = computeSpringNaturalFrequencies(mass, springConstant);
   const gamma = b / (2.0 * mass);
 
   if (b === 0) {
-    if (Omega < omega0) return 0;
-    if (Omega > omega0) return Math.PI;
-    return Math.PI / 2.0; // exact boundary at resonance
+    if (Math.abs(Omega - omega0) < 1e-12) {
+      return null; // Undefined phase at singular undamped resonance
+    }
+    return Omega < omega0 ? 0 : Math.PI;
   }
 
   const y = 2.0 * gamma * Omega;
@@ -709,6 +841,7 @@ export function computeResonancePeak(
 
 /**
  * Generates an array of points for the analytical frequency response curve A(Ω).
+ * Starts at Ω = 0 by default to display the static deflection endpoint A(0) = F0 / k.
  */
 export function computeResonanceCurve(
   params: SpringParams,
@@ -718,7 +851,7 @@ export function computeResonanceCurve(
   const { mass, springConstant } = params;
   const { omega0 } = computeSpringNaturalFrequencies(mass, springConstant);
 
-  const minOmega = options?.minOmega ?? Math.max(0.1, 0.1 * omega0);
+  const minOmega = options?.minOmega ?? 0.0;
   const maxOmega = options?.maxOmega ?? 2.5 * omega0;
   const steps = options?.steps ?? 100;
 
@@ -729,7 +862,7 @@ export function computeResonanceCurve(
     const Omega = minOmega + i * dOmega;
     const amplitude = computeSteadyStateAmplitude(params, { driverForce, drivingFrequency: Omega });
     const phaseLagRad = computePhaseLag(params, Omega);
-    const phaseLagDeg = (phaseLagRad * 180.0) / Math.PI;
+    const phaseLagDeg = phaseLagRad !== null ? (phaseLagRad * 180.0) / Math.PI : null;
 
     points.push({
       drivingFrequencyRad: Omega,
@@ -831,13 +964,16 @@ export function stepForcedOscillatorRK4(
 }
 
 // ============================================================================
-// Simple Pendulum: Small-Angle & Exact Nonlinear RK4
+// Simple Pendulum: Linearized SHM & Exact Nonlinear RK4
 // ============================================================================
 
 /**
- * Computes analytical state of simple pendulum under small-angle approximation (sinθ ≈ θ):
- *   θ(t) = θ0 · cos(ω0·t)
- *   v(t) = -ω0 · L · θ0 · sin(ω0·t)
+ * Computes analytical state of simple pendulum under self-consistent linearized SHM (sinθ ≈ θ):
+ *   α(t) = -(g / L) · θ(t)
+ *   τ(t) = -m · g · L · θ(t)
+ *   U_approx(t) = 0.5 · m · g · L · θ(t)²
+ *   K(t) = 0.5 · m · L² · ω(t)²
+ *   E_total = K + U_approx = 0.5 · m · g · L · θ0² (Constant)
  */
 export function computeSmallAnglePendulumState(
   params: PendulumParams,
@@ -853,11 +989,14 @@ export function computeSmallAnglePendulumState(
 
   const linearDisplacement = L * angleRad;
   const linearVelocity = L * angularVelocity;
-  const restoringTorque = -m * g * L * Math.sin(angleRad);
+
+  // Internally consistent linearized restoring torque and potential energy
+  const restoringTorque = -m * g * L * angleRad;
+  const approximatePotentialEnergy = 0.5 * m * g * L * angleRad * angleRad;
+  const exactPotentialEnergy = m * g * L * (1.0 - Math.cos(angleRad));
 
   const kineticEnergy = 0.5 * m * linearVelocity * linearVelocity;
-  const potentialEnergy = m * g * L * (1.0 - Math.cos(angleRad));
-  const totalEnergy = kineticEnergy + potentialEnergy;
+  const totalEnergy = kineticEnergy + approximatePotentialEnergy; // Conserved linear energy
 
   return {
     time,
@@ -869,14 +1008,19 @@ export function computeSmallAnglePendulumState(
     linearVelocity,
     restoringTorque,
     kineticEnergy,
-    potentialEnergy,
+    potentialEnergy: approximatePotentialEnergy,
     totalEnergy,
+    approximatePotentialEnergy,
+    exactPotentialEnergy,
   };
 }
 
 /**
  * 4th-Order Runge-Kutta step for exact nonlinear simple pendulum:
  *   θ'' = -(g / L) · sin(θ)
+ *   τ = -m · g · L · sin(θ)
+ *   U = m · g · L · (1 - cosθ)
+ *   E = K + U = m · g · L · (1 - cosθ0) (Constant)
  */
 export function stepNonlinearPendulumRK4(
   state: PendulumState,
@@ -911,8 +1055,9 @@ export function stepNonlinearPendulumRK4(
   const restoringTorque = -m * g * L * Math.sin(newTheta);
 
   const kineticEnergy = 0.5 * m * linearVelocity * linearVelocity;
-  const potentialEnergy = m * g * L * (1.0 - Math.cos(newTheta));
-  const totalEnergy = kineticEnergy + potentialEnergy;
+  const exactPotentialEnergy = m * g * L * (1.0 - Math.cos(newTheta));
+  const approximatePotentialEnergy = 0.5 * m * g * L * newTheta * newTheta;
+  const totalEnergy = kineticEnergy + exactPotentialEnergy; // Conserved nonlinear energy
 
   return {
     time: newTime,
@@ -924,8 +1069,10 @@ export function stepNonlinearPendulumRK4(
     linearVelocity,
     restoringTorque,
     kineticEnergy,
-    potentialEnergy,
+    potentialEnergy: exactPotentialEnergy,
     totalEnergy,
+    approximatePotentialEnergy,
+    exactPotentialEnergy,
   };
 }
 

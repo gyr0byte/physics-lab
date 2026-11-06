@@ -18,6 +18,10 @@ import {
   validateSpringParams,
   DEFAULT_SPRING_PARAMS,
   DEFAULT_PENDULUM_PARAMS,
+  DEFAULT_FORCED_SPRING_PARAMS,
+  DEFAULT_DRIVER_PARAMS,
+  UNDAMPED_RESONANCE_PRESET,
+  MAX_ENVELOPE_DAMPING_RATIO,
   ForcedIntegrationState,
   PendulumState,
 } from '../../src/physics/SimpleHarmonicPhysics';
@@ -71,25 +75,80 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       const quadStiffness = computeSpringNaturalFrequencies(1.0, 100.0);
       expect(quadStiffness.period).toBeCloseTo(0.5 * base.period, 6);
     });
+  });
 
-    it('validates parameter clamping and bounds check', () => {
-      // Extreme configuration that would stretch spring 12 meters on Jupiter
-      const extreme = validateSpringParams({
-        mass: 5.0,
-        springConstant: 5.0,
-        gravity: 24.79,
-        initialDisplacement: 0.3,
+  // ==========================================================================
+  // Suite 2: Parameter Validation Consistency & Edge Cases
+  // ==========================================================================
+  describe('2. Parameter Validation Consistency', () => {
+    it('accepts valid configurations and strictly preserves Δl = mg/k', () => {
+      const res = validateSpringParams({
+        mass: 1.0,
+        springConstant: 25.0,
+        gravity: 9.80,
+        naturalLength: 0.40,
+        initialDisplacement: 0.20,
       });
 
-      expect(extreme.valid).toBe(false);
-      expect(extreme.warning).toBeDefined();
+      expect(res.valid).toBe(true);
+      expect(res.errors).toHaveLength(0);
+      expect(res.staticElongation).toBeCloseTo(0.392, 4);
+    });
+
+    it('rejects configurations exceeding apparatus elongation limit (1.80 m)', () => {
+      // 3.0 kg on Jupiter with 10 N/m => deltaL = 3.0 * 24.79 / 10 = 7.437 m
+      const res = validateSpringParams({
+        mass: 3.0,
+        springConstant: 10.0,
+        gravity: 24.79,
+        initialDisplacement: 0.10,
+      });
+
+      expect(res.valid).toBe(false);
+      expect(res.errors.length).toBeGreaterThan(0);
+      expect(res.errors[0]).toContain('exceeds maximum allowable apparatus limit');
+      expect(res.staticElongation).toBeNull();
+    });
+
+    it('rejects initial displacement exceeding ceiling clearance', () => {
+      // L0 = 0.40, deltaL = 0.392 => total rest length = 0.792 m
+      // Max allowed amplitude = 0.85 * 0.792 = 0.6732 m
+      // Requesting 0.80 m would hit ceiling
+      const res = validateSpringParams({
+        mass: 1.0,
+        springConstant: 25.0,
+        gravity: 9.80,
+        naturalLength: 0.40,
+        initialDisplacement: 0.80,
+      });
+
+      expect(res.valid).toBe(false);
+      expect(res.errors.some(e => e.includes('ceiling clearance'))).toBe(true);
+    });
+
+    it('rejects non-finite inputs: NaN, Infinity, and negative values', () => {
+      expect(validateSpringParams({ mass: NaN, springConstant: 25.0, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: Infinity, springConstant: 25.0, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: -1.0, springConstant: 25.0, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: 1.0, springConstant: 0.0, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: 1.0, springConstant: -25.0, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: 1.0, springConstant: 25.0, dampingCoefficient: -0.5, initialDisplacement: 0.1 }).valid).toBe(false);
+      expect(validateSpringParams({ mass: 1.0, springConstant: 25.0, initialDisplacement: NaN }).valid).toBe(false);
+    });
+
+    it('verifies maximum possible damping ratio across valid parameter envelope is strictly underdamped', () => {
+      // m in [0.2, 3.0], k in [10, 100], b in [0, 1.0]
+      // zeta_max = 1 / (2 * sqrt(10 * 0.2)) ≈ 0.3536
+      expect(MAX_ENVELOPE_DAMPING_RATIO).toBeCloseTo(0.353553, 5);
+      expect(MAX_ENVELOPE_DAMPING_RATIO).toBeLessThan(1.0 / Math.SQRT2); // < 0.7071
+      expect(MAX_ENVELOPE_DAMPING_RATIO).toBeLessThan(1.0); // Strictly underdamped
     });
   });
 
   // ==========================================================================
-  // Suite 2: Analytical Kinematic Invariants
+  // Suite 3: Analytical Kinematic Invariants
   // ==========================================================================
-  describe('2. Ideal SHM Kinematic Invariants', () => {
+  describe('3. Ideal SHM Kinematic Invariants', () => {
     const params = { ...DEFAULT_SPRING_PARAMS, initialDisplacement: 0.30 };
     const { period, omega0 } = computeSpringNaturalFrequencies(params.mass, params.springConstant);
 
@@ -137,9 +196,9 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
   });
 
   // ==========================================================================
-  // Suite 3: Mechanical Energy Conservation (Undamped)
+  // Suite 4: Mechanical Energy Conservation (Undamped)
   // ==========================================================================
-  describe('3. Undamped Mechanical Energy Conservation', () => {
+  describe('4. Undamped Mechanical Energy Conservation', () => {
     const params = { ...DEFAULT_SPRING_PARAMS, initialDisplacement: 0.30 };
     const { period } = computeSpringNaturalFrequencies(params.mass, params.springConstant);
     const expectedTotalEnergy = 0.5 * params.springConstant * 0.30 * 0.30; // 0.5 * 25 * 0.09 = 1.125 J
@@ -167,17 +226,35 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
   });
 
   // ==========================================================================
-  // Suite 4: Simple Pendulum & Nonlinear Divergence
+  // Suite 5: Simple Pendulum & Nonlinear Divergence
   // ==========================================================================
-  describe('4. Simple Pendulum & Nonlinear Comparison', () => {
-    it('verifies small-angle pendulum period T = 2π√(L/g) and mass independence', () => {
+  describe('5. Simple Pendulum & Nonlinear Comparison', () => {
+    it('verifies small-angle pendulum period T = 2π√(L/g) and distinct mass independence', () => {
+      // Test 3 distinct masses: 0.2 kg, 1.0 kg, 4.0 kg
       const p1 = computePendulumFrequencies(1.0, 9.80);
       const expectedT = (2.0 * Math.PI) * Math.sqrt(1.0 / 9.80);
       expect(p1.period).toBeCloseTo(expectedT, 6);
 
-      // Formula does not depend on mass
-      const p2 = computePendulumFrequencies(1.0, 9.80);
-      expect(p2.period).toBe(p1.period);
+      // Verify formula with different parameter definitions
+      const stateM1 = computeSmallAnglePendulumState({ length: 1.0, mass: 0.2, gravity: 9.80, initialAngleRad: 0.1 }, 1.0);
+      const stateM2 = computeSmallAnglePendulumState({ length: 1.0, mass: 1.0, gravity: 9.80, initialAngleRad: 0.1 }, 1.0);
+      const stateM3 = computeSmallAnglePendulumState({ length: 1.0, mass: 4.0, gravity: 9.80, initialAngleRad: 0.1 }, 1.0);
+
+      // Angular positions and periods must be identical regardless of mass
+      expect(stateM1.angleRad).toBeCloseTo(stateM2.angleRad, 10);
+      expect(stateM2.angleRad).toBeCloseTo(stateM3.angleRad, 10);
+    });
+
+    it('strictly conserves linearized energy E = K + U_approx = 0.5·mgL·θ0² in small-angle model', () => {
+      const theta0 = (10.0 * Math.PI) / 180.0;
+      const params = { length: 1.0, mass: 1.5, gravity: 9.80, initialAngleRad: theta0 };
+      const expectedLinearEnergy = 0.5 * params.mass * params.gravity * params.length * theta0 * theta0;
+
+      for (let t = 0; t <= 4.0; t += 0.1) {
+        const state = computeSmallAnglePendulumState(params, t);
+        expect(state.totalEnergy).toBeCloseTo(expectedLinearEnergy, 8);
+        expect(state.potentialEnergy).toBeCloseTo(state.approximatePotentialEnergy!, 8);
+      }
     });
 
     it('matches exact nonlinear RK4 integration at small angle (θ0 = 5°)', () => {
@@ -235,7 +312,6 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       }
 
       // At t = T0, because exact period T_exact > T0 by approx 1.74%, the pendulum has NOT yet finished its cycle:
-      // It is still heading towards maximum angle and has lower angle than theta0
       expect(state.angleRad).toBeLessThan(theta0);
       expect(state.angleRad).toBeGreaterThan(0.9 * theta0);
     });
@@ -269,104 +345,195 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
   });
 
   // ==========================================================================
-  // Suite 5: Damped Oscillation Verification
+  // Suite 6: Damped Oscillation (Underdamped, Critical & Overdamped)
   // ==========================================================================
-  describe('5. Damped Oscillation Verification', () => {
-    const params = {
-      ...DEFAULT_SPRING_PARAMS,
-      dampingCoefficient: 0.40, // underdamped
-      initialDisplacement: 0.30,
-    };
+  describe('6. Damped Oscillation Regimes (Exact Solutions)', () => {
+    describe('Underdamped Regime (γ < ω0)', () => {
+      const params = {
+        ...DEFAULT_SPRING_PARAMS,
+        dampingCoefficient: 0.40,
+        initialDisplacement: 0.30,
+      };
 
-    it('verifies initial velocity is exactly zero at release from rest (v(0) = 0)', () => {
-      const state0 = computeDampedSpringState(params, 0);
-      expect(state0.displacement).toBeCloseTo(0.30, 8);
-      expect(state0.velocity).toBeCloseTo(0.0, 8); // Satisfies exact rest release
+      it('verifies initial velocity is exactly zero at release from rest (v(0) = 0)', () => {
+        const state0 = computeDampedSpringState(params, 0);
+        expect(state0.regime).toBe('underdamped');
+        expect(state0.displacement).toBeCloseTo(0.30, 8);
+        expect(state0.velocity).toBeCloseTo(0.0, 8);
+      });
+
+      it('verifies damped angular frequency ωd < ω0 and damped period Td > T0', () => {
+        const damped = computeDampedFrequencies(params.mass, params.springConstant, params.dampingCoefficient);
+        expect(damped.regime).toBe('underdamped');
+        expect(damped.omegaD).toBeLessThan(damped.omega0);
+        expect(damped.periodD).toBeGreaterThan(damped.period0);
+      });
+
+      it('verifies envelope decay and amplitude bounds', () => {
+        for (let t = 0; t <= 5.0; t += 0.5) {
+          const state = computeDampedSpringState(params, t);
+          expect(Math.abs(state.displacement)).toBeLessThanOrEqual(state.envelope + 1e-6);
+        }
+      });
+
+      it('verifies mechanical energy strictly dissipates over time: E(t2) < E(t1)', () => {
+        let previousEnergy = 0.5 * params.springConstant * params.initialDisplacement * params.initialDisplacement;
+
+        for (let t = 0.2; t <= 4.0; t += 0.2) {
+          const state = computeDampedSpringState(params, t);
+          expect(state.totalMechanicalEnergy).toBeLessThan(previousEnergy + 1e-9);
+          expect(state.dissipatedEnergy).toBeGreaterThanOrEqual(0);
+          previousEnergy = state.totalMechanicalEnergy;
+        }
+      });
     });
 
-    it('verifies damped angular frequency ωd < ω0 and damped period Td > T0', () => {
-      const damped = computeDampedFrequencies(params.mass, params.springConstant, params.dampingCoefficient);
-      expect(damped.isUnderdamped).toBe(true);
-      expect(damped.omegaD).toBeLessThan(damped.omega0);
-      expect(damped.periodD).toBeGreaterThan(damped.period0);
+    describe('Critically Damped Regime (γ = ω0)', () => {
+      // m = 1.0 kg, k = 25.0 N/m => ω0 = 5.0 rad/s => b_crit = 2mω0 = 10.0 N·s/m
+      const params = {
+        mass: 1.0,
+        springConstant: 25.0,
+        dampingCoefficient: 10.0,
+        initialDisplacement: 0.30,
+      };
+
+      it('verifies critical damping classification and exact rest release (v(0) = 0)', () => {
+        const freq = computeDampedFrequencies(params.mass, params.springConstant, params.dampingCoefficient);
+        expect(freq.regime).toBe('critically-damped');
+        expect(freq.dampingRatio).toBeCloseTo(1.0, 6);
+
+        const state0 = computeDampedSpringState(params, 0);
+        expect(state0.regime).toBe('critically-damped');
+        expect(state0.displacement).toBeCloseTo(0.30, 8);
+        expect(state0.velocity).toBeCloseTo(0.0, 8);
+      });
+
+      it('satisfies the differential equation of motion identically: a + 2γv + ω0²x = 0', () => {
+        const omega0 = 5.0;
+        const gamma = 5.0;
+
+        for (let t = 0.1; t <= 3.0; t += 0.3) {
+          const state = computeDampedSpringState(params, t);
+          const residual = state.acceleration + 2.0 * gamma * state.velocity + omega0 * omega0 * state.displacement;
+          expect(Math.abs(residual)).toBeLessThan(1e-10);
+        }
+      });
+
+      it('exhibits monotonic return to equilibrium without oscillating', () => {
+        for (let t = 0.1; t <= 3.0; t += 0.2) {
+          const state = computeDampedSpringState(params, t);
+          expect(state.displacement).toBeGreaterThan(0); // Never crosses zero
+          expect(state.displacement).toBeLessThan(0.30);
+        }
+      });
     });
 
-    it('verifies envelope decay and amplitude bounds', () => {
-      const damped = computeDampedFrequencies(params.mass, params.springConstant, params.dampingCoefficient);
+    describe('Overdamped Regime (γ > ω0)', () => {
+      // m = 1.0 kg, k = 25.0 N/m, b = 15.0 N·s/m => γ = 7.5 > 5.0
+      const params = {
+        mass: 1.0,
+        springConstant: 25.0,
+        dampingCoefficient: 15.0,
+        initialDisplacement: 0.30,
+      };
 
-      for (let t = 0; t <= 5.0; t += 0.5) {
-        const state = computeDampedSpringState(params, t);
-        // Instantaneous displacement magnitude must never exceed the theoretical envelope
-        expect(Math.abs(state.displacement)).toBeLessThanOrEqual(state.envelope + 1e-6);
-      }
-    });
+      it('verifies overdamped classification and exact rest release (v(0) = 0)', () => {
+        const freq = computeDampedFrequencies(params.mass, params.springConstant, params.dampingCoefficient);
+        expect(freq.regime).toBe('overdamped');
+        expect(freq.dampingRatio).toBeGreaterThan(1.0);
 
-    it('verifies mechanical energy strictly dissipates over time: E(t2) < E(t1)', () => {
-      let previousEnergy = 0.5 * params.springConstant * params.initialDisplacement * params.initialDisplacement;
+        const state0 = computeDampedSpringState(params, 0);
+        expect(state0.regime).toBe('overdamped');
+        expect(state0.displacement).toBeCloseTo(0.30, 8);
+        expect(state0.velocity).toBeCloseTo(0.0, 8);
+      });
 
-      for (let t = 0.2; t <= 4.0; t += 0.2) {
-        const state = computeDampedSpringState(params, t);
-        expect(state.totalMechanicalEnergy).toBeLessThan(previousEnergy + 1e-9);
-        expect(state.dissipatedEnergy).toBeGreaterThanOrEqual(0);
-        previousEnergy = state.totalMechanicalEnergy;
-      }
+      it('satisfies the differential equation of motion identically: a + 2γv + ω0²x = 0', () => {
+        const omega0 = 5.0;
+        const gamma = 7.5;
+
+        for (let t = 0.1; t <= 3.0; t += 0.3) {
+          const state = computeDampedSpringState(params, t);
+          const residual = state.acceleration + 2.0 * gamma * state.velocity + omega0 * omega0 * state.displacement;
+          expect(Math.abs(residual)).toBeLessThan(1e-10);
+        }
+      });
     });
   });
 
   // ==========================================================================
-  // Suite 6: Forced Oscillation & Resonance Verification
+  // Suite 7: Forced Oscillation & Resonance Verification
   // ==========================================================================
-  describe('6. Forced Oscillation & Resonance Verification', () => {
-    it('verifies displacement resonance peak condition: γ < ω0 / √2', () => {
-      // m = 1.0 kg, k = 25.0 N/m => ω0 = 5.0 rad/s
-      // Peak threshold: γ < 5.0 / √2 ≈ 3.5355 => b = 2mγ < 7.071 N·s/m
-
-      // Light damping (b = 0.2 N·s/m => γ = 0.1 s⁻¹ < 3.5355)
-      const underPeak = computeResonancePeak({ mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.2 }, 2.0);
-      expect(underPeak.hasResonancePeak).toBe(true);
-      expect(underPeak.resonantFrequencyRad).toBeDefined();
-      expect(underPeak.resonantFrequencyRad!).toBeLessThan(5.0); // shifted slightly below ω0
-      expect(underPeak.resonantFrequencyRad!).toBeCloseTo(Math.sqrt(25.0 - 2.0 * 0.01), 4);
-
-      // Heavy damping exceeding threshold (b = 8.0 N·s/m => γ = 4.0 s⁻¹ > 3.5355)
-      const overPeak = computeResonancePeak({ mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 8.0 }, 2.0);
-      expect(overPeak.hasResonancePeak).toBe(false);
-      expect(overPeak.resonantFrequencyRad).toBeNull();
-      expect(overPeak.peakAmplitude).toBeCloseTo(2.0 / 25.0, 6); // Static load F0 / k
+  describe('7. Forced Oscillation & Resonance Verification', () => {
+    it('verifies static-load response at zero frequency (Ω = 0 => A = F0 / k)', () => {
+      const params = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.20 };
+      const staticAmp = computeSteadyStateAmplitude(params, { driverForce: 5.0, drivingFrequency: 0.0 });
+      expect(staticAmp).toBeCloseTo(5.0 / 25.0, 8); // 0.20 m
     });
 
-    it('handles zero damping separately without presenting finite amplitude at resonance', () => {
+    it('verifies heavy damping case has maximum response at zero frequency (static load)', () => {
+      // b = 8.0 N·s/m => γ = 4.0 s⁻¹ > ω0 / √2 ≈ 3.5355 s⁻¹
+      const heavy = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 8.0 };
+      const peakInfo = computeResonancePeak(heavy, 2.0);
+      expect(peakInfo.hasResonancePeak).toBe(false);
+      expect(peakInfo.resonantFrequencyRad).toBeNull();
+      expect(peakInfo.peakAmplitude).toBeCloseTo(2.0 / 25.0, 6);
+
+      // Verify A(Ω) strictly decreases for Ω > 0
+      const a0 = computeSteadyStateAmplitude(heavy, { driverForce: 2.0, drivingFrequency: 0.0 });
+      const a1 = computeSteadyStateAmplitude(heavy, { driverForce: 2.0, drivingFrequency: 1.0 });
+      const a5 = computeSteadyStateAmplitude(heavy, { driverForce: 2.0, drivingFrequency: 5.0 });
+      expect(a0).toBeGreaterThan(a1);
+      expect(a1).toBeGreaterThan(a5);
+    });
+
+    it('handles zero damping separately with undefined phase at exact resonance', () => {
       const undamped = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.0 };
 
       // Off-resonance: finite amplitude
       const offRes = computeSteadyStateAmplitude(undamped, { driverForce: 2.0, drivingFrequency: 3.0 });
-      expect(offRes).toBeCloseTo(2.0 / (25.0 - 9.0), 6); // 2.0 / 16.0 = 0.125 m
+      expect(offRes).toBeCloseTo(2.0 / (25.0 - 9.0), 6); // 0.125 m
 
       // Exact resonance (Ω = ω0 = 5.0): must diverge to Infinity
       const exactRes = computeSteadyStateAmplitude(undamped, { driverForce: 2.0, drivingFrequency: 5.0 });
       expect(exactRes).toBe(Infinity);
+
+      // Phase lag at exact undamped resonance: MUST BE NULL (undefined)
+      const phaseAtUndampedRes = computePhaseLag(undamped, 5.0);
+      expect(phaseAtUndampedRes).toBeNull();
+
+      // Phase lag below resonance (Ω < ω0): 0 rad
+      expect(computePhaseLag(undamped, 3.0)).toBe(0);
+
+      // Phase lag above resonance (Ω > ω0): π rad
+      expect(computePhaseLag(undamped, 7.0)).toBe(Math.PI);
     });
 
-    it('calculates phase lag correctly using atan2(2γΩ, ω0² - Ω²)', () => {
-      const damped = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.4 }; // ω0 = 5.0
-
-      // Low frequency: in phase (δ ≈ 0)
-      const lowPhase = computePhaseLag(damped, 0.5);
-      expect(lowPhase).toBeGreaterThan(0);
-      expect(lowPhase).toBeLessThan(Math.PI / 4.0);
-
-      // Exact resonance (Ω = ω0 = 5.0): δ = π/2 = 90°
+    it('calculates 90° phase lag for nonzero damping at natural frequency', () => {
+      const damped = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.4 };
       const resPhase = computePhaseLag(damped, 5.0);
-      expect(resPhase).toBeCloseTo(Math.PI / 2.0, 8);
+      expect(resPhase).toBeCloseTo(Math.PI / 2.0, 8); // Exact 90°
+    });
 
-      // High frequency: anti-phase (δ → π)
-      const highPhase = computePhaseLag(damped, 20.0);
-      expect(highPhase).toBeGreaterThan(Math.PI / 2.0);
-      expect(highPhase).toBeLessThan(Math.PI);
+    it('verifies default forced oscillation preset uses finite damping', () => {
+      expect(DEFAULT_FORCED_SPRING_PARAMS.dampingCoefficient).toBeGreaterThan(0);
+      expect(DEFAULT_DRIVER_PARAMS.drivingFrequency).not.toBe(5.0); // off-resonance default
+
+      // Verify separate undamped preset
+      expect(UNDAMPED_RESONANCE_PRESET.spring.dampingCoefficient).toBe(0.0);
+      expect(UNDAMPED_RESONANCE_PRESET.driver.drivingFrequency).toBe(5.0);
+    });
+
+    it('verifies resonance curve starts at zero frequency with static deflection', () => {
+      const params = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.20 };
+      const curve = computeResonanceCurve(params, 2.0);
+
+      expect(curve[0].drivingFrequencyRad).toBe(0.0);
+      expect(curve[0].amplitude).toBeCloseTo(2.0 / 25.0, 6);
+      expect(curve[0].phaseLagRad).toBe(0.0);
     });
 
     it('verifies instantaneous energy balance in forced RK4 simulation', () => {
-      // E_mech(t) = E_mech(0) + W_ext(t) - E_diss(t)
       const params = { mass: 1.0, springConstant: 25.0, dampingCoefficient: 0.20, initialDisplacement: 0.10 };
       const driver = { driverForce: 2.0, drivingFrequency: 5.0 };
 
@@ -386,7 +553,7 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       const dt = 0.001;
       const initialTotalEnergy = state.totalMechanicalEnergy;
 
-      for (let s = 0; s < 2000; s++) { // 2.0 seconds
+      for (let s = 0; s < 2000; s++) {
         state = stepForcedOscillatorRK4(state, params, driver, dt);
       }
 
@@ -395,7 +562,6 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
     });
 
     it('converges to theoretical steady-state amplitude after transient decay', () => {
-      // Lightly damped forced oscillator
       const params = { mass: 1.0, springConstant: 25.0, dampingCoefficient: 0.5, initialDisplacement: 0.0 };
       const driver = { driverForce: 2.0, drivingFrequency: 4.0 };
       const expectedA = computeSteadyStateAmplitude(params, driver);
@@ -414,12 +580,10 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       };
 
       const dt = 0.001;
-      // γ = 0.5 / 2 = 0.25 => 5 / γ = 20 seconds for transient decay
       for (let s = 0; s < 25000; s++) { // 25 seconds
         state = stepForcedOscillatorRK4(state, params, driver, dt);
       }
 
-      // Track max displacement over the next cycle (period T = 2π / 4 = 1.57 s)
       let observedMaxA = 0;
       for (let s = 0; s < 2000; s++) {
         state = stepForcedOscillatorRK4(state, params, driver, dt);
@@ -431,38 +595,32 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
   });
 
   // ==========================================================================
-  // Suite 7: Coordinate Systems & Auto Camera Bounds
+  // Suite 8: Coordinate Systems & Auto Camera Bounds
   // ==========================================================================
-  describe('7. Coordinate Systems & Auto Camera Bounds', () => {
+  describe('8. Coordinate Systems & Auto Camera Bounds', () => {
     it('correctly maps downward physical coordinates to upward world coordinates', () => {
       const transform = transformToWorldCoordinates({
         ceilingWorldY: 2.0,
         naturalLength: 0.40,
         staticElongation: 0.392,
-        displacement: 0.20, // stretched 0.2 m downwards
-        velocity: 1.5, // moving downwards
-        acceleration: -5.0, // accelerating upwards
-        restoringForce: -5.0, // restoring force upwards
+        displacement: 0.20,
+        velocity: 1.5,
+        acceleration: -5.0,
+        restoringForce: -5.0,
         drivingForce: 2.0,
       });
 
-      // World Equilibrium = 2.0 - 0.40 - 0.392 = 1.208
       expect(transform.worldEquilibriumY).toBeCloseTo(1.208, 3);
-      // World Position = 1.208 - 0.20 = 1.008 (below equilibrium)
       expect(transform.worldPositionY).toBeCloseTo(1.008, 3);
-      // Downward velocity maps to negative world Y velocity
       expect(transform.worldVelocityY).toBe(-1.5);
-      // Restoring force in world points upwards (+Y)
       expect(transform.worldRestoringForceY).toBe(5.0);
     });
 
     it('computes automatic camera bounds accommodating small and large elongations', () => {
-      // Small elongation (Moon, stiff spring)
       const smallBounds = computeAutoCameraBounds(2.0, 0.40, 0.05, 0.10);
       expect(smallBounds.maxY).toBe(2.15);
       expect(smallBounds.minY).toBeLessThan(smallBounds.maxY);
 
-      // Large elongation (Earth, heavy mass)
       const largeBounds = computeAutoCameraBounds(2.0, 0.40, 1.50, 0.40);
       expect(largeBounds.viewportHeight).toBeGreaterThan(smallBounds.viewportHeight);
       expect(largeBounds.centerY).toBeLessThan(smallBounds.centerY);

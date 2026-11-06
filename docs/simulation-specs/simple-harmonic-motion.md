@@ -140,11 +140,22 @@ A point mass $m$ is suspended by a light, inextensible cord of length $L$ from a
 
    > **Curriculum Insight:** Students can toggle a "Small-Angle SHM vs. Exact Nonlinear" ghost trail overlay to directly watch the exact pendulum fall behind the linear sinusoidal model as amplitude increases.
 
-4. **Pendulum Energy:**
-   - Kinetic Energy: $K = \frac{1}{2}m v^2 = \frac{1}{2}mL^2 \dot{\theta}^2$
-   - Exact Gravitational Potential Energy: $U(\theta) = mgL(1 - \cos\theta)$
-   - Small-angle approximation: $U(\theta) \approx \frac{1}{2}mgL\theta^2 = \frac{1}{2} \left(\frac{mg}{L}\right) s^2$
-   - Total Energy: $E = K + U = mgL(1 - \cos\theta_0) \equiv \text{constant}$.
+4. **Pendulum Energy & Internal Consistency:**
+   - **Small-Angle Linearized Model:**
+     - Restoring torque: $\tau_{\text{linear}} = -mgL\theta$
+     - Angular acceleration: $\alpha_{\text{linear}} = -\frac{g}{L}\theta$
+     - Kinetic Energy: $K = \frac{1}{2}m v^2 = \frac{1}{2}mL^2 \dot{\theta}^2$
+     - Approximate Potential Energy: $U_{\text{approx}}(\theta) = \frac{1}{2}mgL\theta^2 = \frac{1}{2}\left(\frac{mg}{L}\right)s^2$
+     - Total Conserved Linear Energy:
+       $$E_{\text{approx}} = K + U_{\text{approx}} = \frac{1}{2}mL^2\dot{\theta}^2 + \frac{1}{2}mgL\theta^2 = \frac{1}{2}mgL\theta_0^2 \equiv \text{constant}$$
+   - **Exact Nonlinear Model:**
+     - Restoring torque: $\tau_{\text{exact}} = -mgL\sin\theta$
+     - Angular acceleration: $\alpha_{\text{exact}} = -\frac{g}{L}\sin\theta$
+     - Kinetic Energy: $K = \frac{1}{2}m v^2 = \frac{1}{2}mL^2 \dot{\theta}^2$
+     - Exact Gravitational Potential Energy: $U_{\text{exact}}(\theta) = mgL(1 - \cos\theta)$
+     - Total Conserved Nonlinear Energy:
+       $$E_{\text{exact}} = K + U_{\text{exact}} = \frac{1}{2}mL^2\dot{\theta}^2 + mgL(1 - \cos\theta) = mgL(1 - \cos\theta_0) \equiv \text{constant}$$
+   > **Scientific Consistency:** The linearized SHM model and the exact nonlinear model each use their own consistent potential energy and restoring torque expressions, ensuring rigorous internal energy conservation for both modes.
 
 ---
 
@@ -300,15 +311,22 @@ All user-adjustable controls enforce strict validation boundaries:
 | **Mass** | $m$ | kg | 1.00 | 0.20 to 3.00 | 0.10 | Must be strictly positive ($m > 0$). Capped at $3.0\text{ kg}$ to prevent excessive elongation. |
 | **Spring Constant** | $k$ | N/m | 25.0 | 10.0 to 100.0 | 5.0 | Must be strictly positive ($k > 0$). $25\text{ N/m}$ gives clean, countable period ($T \approx 1.26\text{ s}$). |
 | **Initial Amplitude** | $A$ | m | 0.30 | 0.05 to 0.50 | 0.05 | Validated against ceiling clearance: requires $A < 0.85(L_0 + \Delta l)$. |
-| **Damping Coeff** | $b$ | $\text{N}\cdot\text{s/m}$ | 0.00 | 0.00 to 1.00 | 0.05 | $b \ge 0$. Max $b=1.0$ guarantees $\zeta \le 0.5 < 1$ for default apparatus (underdamped). |
+| **Damping Coeff** | $b$ | $\text{N}\cdot\text{s/m}$ | 0.00 | 0.00 to 1.00 | 0.05 | $b \ge 0$. Across full ranges ($m \ge 0.2\text{ kg}, k \ge 10\text{ N/m}, b \le 1.0\text{ N}\cdot\text{s/m}$), $\zeta_{\max} = \frac{1.0}{2\sqrt{10 \times 0.2}} = \frac{1}{2\sqrt{2}} \approx 0.3536 < 0.7071$. Strictly underdamped. |
 | **Pendulum Length** | $L$ | m | 1.00 | 0.30 to 2.50 | 0.10 | Must be strictly positive ($L > 0$). $L = 1.00\text{ m}$ gives standard "seconds pendulum" ($T \approx 2.0\text{ s}$). |
 | **Pendulum Angle** | $\theta_0$ | deg | $12^\circ$ | $2^\circ$ to $30^\circ$ | $1^\circ$ | Default $12^\circ$ stays in small-angle regime ($0.27\%$ error). $30^\circ$ enables nonlinear comparison. |
 | **Gravity** | $g$ | $\text{m/s}^2$ | 9.80 | 1.62 to 24.79 | 0.10 | Presets: Moon (1.62), Earth (9.80), Jupiter (24.79). Validates period gravity independence. |
-| **Driving Freq** | $\Omega$ | rad/s | 5.00 | 1.00 to 15.00 | 0.20 | Spans across natural frequency $\omega_0 = \sqrt{25/1} = 5.00\text{ rad/s}$ ($f \approx 0.796\text{ Hz}$). |
+| **Driving Freq** | $\Omega$ | rad/s | 4.00 | 0.00 to 15.00 | 0.20 | Allows static load ($\Omega = 0 \implies A = F_0/k$) and sweeps across resonance $\omega_0 = 5.00\text{ rad/s}$. |
 | **Driver Force** | $F_0$ | N | 2.00 | 0.50 to 5.00 | 0.50 | Sufficient force to demonstrate steady-state resonance without visual off-screen excursion. |
 
-**Cross-Parameter Validation Clamp:**
-- Static elongation is constrained: $\Delta l = \frac{mg}{k} \le 1.80\text{ m}$. If a user selects an extreme combination (e.g. $m=3.0\text{ kg}$ on Jupiter $g=24.79\text{ m/s}^2$ with $k=10\text{ N/m}$, which would yield $\Delta l = 7.44\text{ m}$), the parameter validator clamps effective elongation to $1.80\text{ m}$ or auto-adjusts $k$ to maintain physical apparatus realism.
+**Default Forced Oscillation Preset:**
+- Default demonstration configuration: $m = 1.0\text{ kg}, k = 25.0\text{ N/m}, b = 0.20\text{ N}\cdot\text{s/m}, F_0 = 2.0\text{ N}, \Omega = 4.0\text{ rad/s}$ ($\omega_0 = 5.0\text{ rad/s}$).
+- Using finite damping ($b = 0.20\text{ N}\cdot\text{s/m}$) guarantees a finite, realistic initial steady-state amplitude ($A \approx 0.22\text{ m}$).
+- Undamped resonance ($b = 0, \Omega = \omega_0$) is maintained as a separate, intentional preset/experiment with an explicit visual warning of unbounded theoretical amplitude ($A \to \infty$).
+
+**Explicit Physical Parameter Validation:**
+- The relationship $\Delta l = \frac{mg}{k}$ is strictly preserved.
+- If an invalid combination yields $\Delta l > 1.80\text{ m}$ (e.g. $m=3.0\text{ kg}$ on Jupiter $g=24.79\text{ m/s}^2$ with $k=10\text{ N/m}$, which gives $\Delta l = 7.44\text{ m}$), `validateSpringParams()` rejects the configuration with an explicit validation error: `Static elongation (${deltaL.toFixed(2)} m) exceeds maximum allowable apparatus limit of 1.80 m.`
+- Non-finite numbers (`NaN`, `Infinity`), non-positive masses, non-positive spring constants, negative damping, and out-of-bounds displacements are strictly rejected.
 
 ---
 
