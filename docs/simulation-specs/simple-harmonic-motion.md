@@ -90,18 +90,21 @@ A helical spring of spring constant $k$ and natural unstretched length $L_0$ is 
    - At equilibrium ($x = 0$): speed is maximum ($|v_{\max}| = \omega_0 A$) and acceleration is zero ($a = 0$).
    - At extreme positions ($x = \pm A$): speed is zero ($v = 0$) and acceleration magnitude is maximum ($|a_{\max}| = \omega_0^2 A$).
 
-6. **Energy Formulation for Vertical Spring:**
+6. **Total Effective Potential Energy for Vertical Spring:**
    - Kinetic Energy: $K = \frac{1}{2}mv^2$
-   - Elastic Potential Energy: $U_s = \frac{1}{2}k(\Delta l + x)^2 = \frac{1}{2}k(\Delta l)^2 + k\Delta l x + \frac{1}{2}kx^2$
-   - Gravitational Potential Energy (reference at $y_{\text{eq}}$): $U_g = -mgx$
+   - Elastic Potential Energy of the spring:
+     $$U_s = \frac{1}{2}k(\Delta l + x)^2 = \frac{1}{2}k(\Delta l)^2 + k\Delta l x + \frac{1}{2}kx^2$$
+   - Gravitational Potential Energy (reference datum $y_g = 0$ at static equilibrium $y_{\text{eq}}$):
+     $$U_g = -mgx$$
    - Total Potential Energy:
-     $$U(x) = U_s + U_g = \frac{1}{2}k(\Delta l)^2 + (k\Delta l - mg)x + \frac{1}{2}kx^2$$
-     Because $k\Delta l = mg$, the linear cross-term $(k\Delta l - mg)x$ identically vanishes:
-     $$U(x) = \frac{1}{2}k(\Delta l)^2 + \frac{1}{2}kx^2$$
-     Referencing potential energy to zero at equilibrium ($x = 0$):
-     $$U(x) = \frac{1}{2}kx^2$$
+     $$U_{\text{total}}(x) = U_s + U_g = \frac{1}{2}k(\Delta l)^2 + (k\Delta l - mg)x + \frac{1}{2}kx^2$$
+     Because static equilibrium requires $k\Delta l = mg$, the linear cross-term $(k\Delta l - mg)x$ vanishes identically:
+     $$U_{\text{total}}(x) = \frac{1}{2}k(\Delta l)^2 + \frac{1}{2}kx^2$$
+   - Referencing potential energy to zero at static equilibrium ($x = 0$):
+     $$U_{\text{eff}}(x) \equiv U_{\text{total}}(x) - U_{\text{total}}(0) = \frac{1}{2}kx^2$$
+     > **Rigorous Terminology:** $U = \frac{1}{2}kx^2$ is the **total effective potential energy relative to static equilibrium**, combining both spring elastic strain energy and gravitational potential energy.
    - Total Mechanical Energy:
-     $$E = K + U = \frac{1}{2}mv^2 + \frac{1}{2}kx^2 = \frac{1}{2}kA^2 \equiv \text{constant}$$
+     $$E = K + U_{\text{eff}} = \frac{1}{2}mv^2 + \frac{1}{2}kx^2 = \frac{1}{2}kA^2 \equiv \text{constant}$$
 
 ---
 
@@ -188,80 +191,188 @@ $$a(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v(t)$$
 
 ### 3.4 Mode 3: Forced Oscillation
 
-An external periodic driving force $F(t) = F_0 \cos(\Omega t)$ of angular frequency $\Omega$ and amplitude $F_0$ acts on the damped oscillator:
+An external periodic driving force $F(t) = F_0 \cos(\Omega t)$ of angular frequency $\Omega$ and amplitude $F_0$ acts on the damped oscillator along its linear axis:
 
 $$m \frac{d^2 x}{dt^2} + b \frac{dx}{dt} + k x = F_0 \cos(\Omega t)$$
 $$\frac{d^2 x}{dt^2} + 2\gamma \frac{dx}{dt} + \omega_0^2 x = \frac{F_0}{m} \cos(\Omega t)$$
 
-#### Complete Solution (Transient + Steady-State):
+#### Complete Solution: Transient vs. Steady-State Distinction
+The complete time-domain motion is the superposition of the complementary (transient) solution and the particular (steady-state) solution:
 $$x(t) = x_{\text{transient}}(t) + x_{\text{steady}}(t)$$
 
-1. **Transient Term $x_{\text{transient}}(t)$:**
-   Governed by natural damped frequency $\omega_d$; exponentially decays to zero ($e^{-\gamma t} \to 0$) after a few periods ($t \gg 1/\gamma$).
-2. **Steady-State Response $x_{\text{steady}}(t)$:**
-   Persists indefinitely, oscillating strictly at the **driving frequency $\Omega$**:
-   $$x_{\text{steady}}(t) = A(\Omega) \cos(\Omega t - \delta)$$
-   where:
-   - **Steady-State Amplitude:**
+1. **Transient Motion $x_{\text{transient}}(t)$ (Time-Domain Integration):**
+   - Governed by natural damped frequency $\omega_d$; decays exponentially according to $e^{-\gamma t}$.
+   - Depends on initial release conditions ($x_0, v_0$), exhibiting initial phase competition, beats, and transient adjustment before settling.
+   - **Simulation Implementation:** The live time-domain simulation uses **fixed-step numerical integration** (4th-order Runge-Kutta / RK4 with $\Delta t \le 0.002\text{ s}$) to solve the complete differential equation directly, ensuring true physical transients, arbitrary start states, and smooth real-time response.
+
+2. **Theoretical Steady-State Response $x_{\text{steady}}(t)$ ($t \gg 1/\gamma$):**
+   - After transients decay, the system oscillates strictly at the **external driving frequency $\Omega$**:
+     $$x_{\text{steady}}(t) = A(\Omega) \cos(\Omega t - \delta)$$
+   - **Analytical Steady-State Amplitude:**
      $$A(\Omega) = \frac{F_0 / m}{\sqrt{(\omega_0^2 - \Omega^2)^2 + 4\gamma^2 \Omega^2}}$$
-   - **Phase Lag $\delta$:**
-     $$\tan\delta = \frac{2\gamma \Omega}{\omega_0^2 - \Omega^2}, \quad \delta \in [0, \pi]$$
-     - At low frequency ($\Omega \ll \omega_0$): $\delta \approx 0$ (in phase with driver).
-     - At resonance ($\Omega = \omega_0$): $\delta = \pi/2 = 90^\circ$ (quarter-cycle lag).
-     - At high frequency ($\Omega \gg \omega_0$): $\delta \to \pi = 180^\circ$ (completely out of phase).
+   - **Phase Lag $\delta$ (Two-Argument Arctangent):**
+     Phase lag is unambiguously calculated across all frequency regimes using:
+     $$\delta = \operatorname{atan2}(2\gamma \Omega, \omega_0^2 - \Omega^2), \quad \delta \in [0, \pi]$$
+     - **Low Frequency ($\Omega \ll \omega_0$):** $\omega_0^2 - \Omega^2 > 0 \implies \delta \approx 0$ (mass moves in phase with driving force).
+     - **Resonance Crossing ($\Omega = \omega_0$):** $\omega_0^2 - \Omega^2 = 0 \implies \delta = \operatorname{atan2}(2\gamma \omega_0, 0) = \frac{\pi}{2} = 90^\circ$ (mass lags driver by exactly a quarter-cycle).
+     - **High Frequency ($\Omega \gg \omega_0$):** $\omega_0^2 - \Omega^2 < 0 \implies \delta \to \pi = 180^\circ$ (mass oscillates in direct opposition to driver).
+
+3. **Special Handling for Zero Damping ($\gamma = 0, b = 0$):**
+   - For $\Omega \ne \omega_0$:
+     $$A(\Omega) = \frac{F_0 / m}{|\omega_0^2 - \Omega^2|}, \quad \delta = \begin{cases} 0 & \text{if } \Omega < \omega_0 \\ \pi & \text{if } \Omega > \omega_0 \end{cases}$$
+   - **Exact Undamped Resonance ($\Omega = \omega_0$):**
+     The denominator vanishes; steady-state amplitude **diverges to infinity** ($A \to \infty$). No finite periodic steady state exists.
+     The exact analytical time-domain solution released from rest ($x(0)=0, v(0)=0$) grows linearly with time:
+     $$x(t) = \frac{F_0}{2m\omega_0} t \sin(\omega_0 t)$$
+     > **Engineering Rule:** The simulation and frequency-response plots **must never present a finite steady-state amplitude** at exact undamped resonance. The resonance curve displays an asymptotic vertical discontinuity at $\Omega = \omega_0$ when $b=0$.
+
+4. **Forced Motion Energy Accounting (External Work vs. Viscous Dissipation):**
+   In forced oscillation, mechanical energy is continuously injected by the driving agent and dissipated by viscous resistance:
+   - **Rate of Work Done by Driver (Power Input):**
+     $$P_{\text{ext}}(t) = \frac{dW_{\text{ext}}}{dt} = F_{\text{ext}}(t) \cdot v(t) = F_0 \cos(\Omega t) \cdot v(t)$$
+     $$W_{\text{ext}}(t) = \int_0^t F_0 \cos(\Omega \tau) v(\tau) d\tau$$
+   - **Rate of Viscous Energy Dissipation:**
+     $$P_{\text{diss}}(t) = \frac{dE_{\text{diss}}}{dt} = b v(t)^2 \ge 0$$
+     $$E_{\text{diss}}(t) = \int_0^t b v(\tau)^2 d\tau$$
+   - **Instantaneous Energy Balance:**
+     Multiplying the equation of motion by $v$:
+     $$m v \dot{v} + b v^2 + k x v = F_0 \cos(\Omega t) v \implies \frac{d}{dt}\left(\frac{1}{2}mv^2 + \frac{1}{2}kx^2\right) = P_{\text{ext}}(t) - P_{\text{diss}}(t)$$
+     Integrating yields the exact closed-loop energy audit:
+     $$E_{\text{mech}}(t) = E_{\text{mech}}(0) + W_{\text{ext}}(t) - E_{\text{diss}}(t)$$
+   - In steady state over a complete driving period $T = 2\pi/\Omega$, net $\Delta E_{\text{mech}} = 0$:
+     $$W_{\text{ext,cycle}} = E_{\text{diss,cycle}} = \pi b \Omega A^2$$
+     The external work done per cycle exactly balances viscous dissipation per cycle.
 
 ---
 
 ### 3.5 Mode 4: Mechanical Resonance
 
-Resonance occurs when the driving frequency $\Omega$ approaches the natural frequency, producing a dramatic amplification of steady-state oscillation.
+Resonance occurs when the external driver frequency approaches the system's natural frequency, maximizing steady-state oscillation.
 
-1. **Resonant Frequency for Amplitude:**
-   Maximizing $A(\Omega)$ by minimizing the denominator $g(\Omega) = (\omega_0^2 - \Omega^2)^2 + 4\gamma^2 \Omega^2$:
-   $$\frac{d}{d\Omega}\left[(\omega_0^2 - \Omega^2)^2 + 4\gamma^2 \Omega^2\right] = 2(\omega_0^2 - \Omega^2)(-2\Omega) + 8\gamma^2 \Omega = 0$$
-   $$-4\Omega (\omega_0^2 - \Omega^2 - 2\gamma^2) = 0$$
-   For $\gamma < \frac{\omega_0}{\sqrt{2}}$:
-   $$\Omega_{\text{res}} = \sqrt{\omega_0^2 - 2\gamma^2} = \omega_0 \sqrt{1 - 2\zeta^2}$$
-   For light damping ($\gamma \ll \omega_0$):
-   $$\Omega_{\text{res}} \approx \omega_0$$
+1. **Displacement Resonance Condition:**
+   Differentiating the amplitude denominator $g(\Omega) = (\omega_0^2 - \Omega^2)^2 + 4\gamma^2 \Omega^2$ with respect to $\Omega$:
+   $$\frac{dg}{d\Omega} = -4\Omega(\omega_0^2 - \Omega^2 - 2\gamma^2) = 0$$
+   Setting the bracket to zero yields the stationary condition:
+   $$\Omega^2 = \omega_0^2 - 2\gamma^2$$
+   - **Case A: Underdamped Peak Condition ($\gamma < \frac{\omega_0}{\sqrt{2}} \iff \zeta < \frac{1}{\sqrt{2}} \approx 0.7071$):**
+     A unique positive-frequency displacement resonance peak exists at:
+     $$\Omega_{\text{res}} = \sqrt{\omega_0^2 - 2\gamma^2} = \omega_0 \sqrt{1 - 2\zeta^2}$$
+     Maximum steady-state peak amplitude:
+     $$A_{\max} = A(\Omega_{\text{res}}) = \frac{F_0 / m}{2\gamma \sqrt{\omega_0^2 - \gamma^2}} = \frac{F_0}{b \omega_d}$$
+     For light damping ($\gamma \ll \omega_0$): $\Omega_{\text{res}} \approx \omega_0$.
+   - **Case B: No Displacement Resonance Peak ($\gamma \ge \frac{\omega_0}{\sqrt{2}} \iff \zeta \ge \frac{1}{\sqrt{2}}$):**
+     When damping is heavy ($\zeta \ge 0.7071$), $\omega_0^2 - 2\gamma^2 \le 0$. **No positive-frequency displacement resonance peak exists.**
+     The denominator $g(\Omega)$ increases monotonically for all $\Omega > 0$.
+     Consequently, steady-state amplitude $A(\Omega)$ decreases monotonically from its maximum at zero frequency (static load):
+     $$A(0) = \frac{F_0 / m}{\omega_0^2} = \frac{F_0}{k}$$
+     > **Engineering Rule:** The physics engine explicitly checks if $\gamma \ge \omega_0 / \sqrt{2}$. If true, it flags `hasResonancePeak: false`, reports `resonantFrequency: null`, and marks the static load $F_0/k$ as the curve maximum.
 
-2. **Maximum Amplitude at Resonance:**
-   $$A_{\max} = A(\Omega_{\text{res}}) = \frac{F_0}{2m\gamma \sqrt{\omega_0^2 - \gamma^2}} = \frac{F_0}{b \omega_d}$$
-   For undamped case ($b \to 0$): $A_{\max} \to \infty$ (theoretically unbounded).
-
-3. **Quality Factor ($Q$) and Resonance Bandwidth:**
+2. **Quality Factor ($Q$) and Resonance Bandwidth:**
+   For underdamped systems:
    $$Q = \frac{\omega_0}{2\gamma} = \frac{\sqrt{km}}{b} = \frac{1}{2\zeta}$$
-   - **High $Q$ (Light Damping):** Tall, narrow, sharp resonance peak.
-   - **Low $Q$ (Heavy Damping):** Broad, shallow resonance peak with shifted maximum.
+   - **High $Q$ (Light Damping, e.g. $b=0.05$):** Tall, narrow, sharp resonance peak requiring precise frequency tuning.
+   - **Low $Q$ (Heavier Damping, e.g. $b=0.50$):** Broad, flattened resonance curve shifted noticeably to the left of $\omega_0$.
 
-4. **Resonance Curve Display:**
-   The Canvas renders an interactive **Amplitude vs. Driving Frequency ($A\text{ vs. }\Omega$)** curve. The current driving frequency is highlighted as a dynamic tracking point along the curve, demonstrating how tuning $\Omega \to \omega_0$ drives the system into peak oscillation.
+3. **Analytical Resonance Curve Display vs. Real-Time Point:**
+   - The Canvas plots the theoretical steady-state analytical curve $A(\Omega)$ across $\Omega \in [0.1\omega_0, 2.5\omega_0]$.
+   - A live tracking indicator highlights the currently selected driver frequency $\Omega$ and instantaneous amplitude, visually illustrating the frequency response curve in real time.
 
 ---
 
-## 4. Parameter Validation & Boundary Constraints
+## 4. Parameter Validation, Coordinate Systems & Physical Assumptions
 
-All user-adjustable sliders enforce strict physical constraints:
+### 4.1 Physical Assumptions of the Simulation Models
+To maintain scientific transparency and educational clarity, the mathematical models are based on explicit physical assumptions:
+1. **Ideal Hookean Spring:** The helical spring is assumed massless, with uniform linear elasticity governed strictly by Hooke's Law ($F_s = -k \Delta l$) throughout its operational displacement. Spring mass inertia and internal coil collisions are neglected.
+2. **Positive Extension Regime:** The spring operates in tension. The initial amplitude is validated such that $A < L_0 + \Delta l$, ensuring the mass never strikes the rigid ceiling mount or collapses into solid height.
+3. **Linear Viscous Damping:** Drag is modeled as laminar fluid/air resistance directly proportional to velocity ($F_d = -b v$). Quadratic turbulent drag ($\propto v^2$) is excluded to preserve linear differential equation solvability aligned with Nepal CDC Grade 12 Subtopic 2.9.
+4. **Ideal Simple Pendulum:** The suspension cord is assumed perfectly inextensible and massless, swinging from a frictionless point pivot in a uniform gravitational field. The bob is treated as a point mass.
+5. **Pure Coaxial External Forcing:** In forced oscillation, the external driving force acts strictly along the vertical axis of the spring without introducing lateral pendular rocking, twisting, or transverse resonant modes.
 
-| Parameter | Symbol | Unit | Default | Valid Range | Step | Physical Justification & Validation Constraint |
+---
+
+### 4.2 Parameter Constraints & Validation Rules
+
+All user-adjustable controls enforce strict validation boundaries:
+
+| Parameter | Symbol | Unit | Default | Valid Range | Step | Validation & Physical Justification |
 |---|:---:|:---:|:---:|:---:|:---:|---|
-| **Mass** | $m$ | kg | 1.00 | 0.20 to 5.00 | 0.10 | Must be strictly positive ($m > 0$). Range matches typical classroom spring apparatus. |
-| **Spring Constant** | $k$ | N/m | 25.0 | 5.0 to 100.0 | 5.0 | Must be strictly positive ($k > 0$). $25\text{ N/m}$ gives clean, easily countable periods ($T \approx 1.26\text{ s}$). |
-| **Initial Amplitude** | $A$ | m | 0.30 | 0.05 to 0.60 | 0.05 | Restricted so mass does not exceed ceiling clamp ($y > 0$) or clip bottom viewport ($y_{\max} \le 2.0\text{ m}$). |
-| **Damping Coeff** | $b$ | $\text{N}\cdot\text{s/m}$ | 0.00 | 0.00 to 1.00 | 0.05 | $b \ge 0$. Max $b=1.0$ ensures $\zeta = \frac{b}{2\sqrt{km}} \le \frac{1.0}{2\sqrt{5 \times 0.2}} = 0.5 < 1$ (strictly underdamped). |
-| **Pendulum Length** | $L$ | m | 1.00 | 0.30 to 2.50 | 0.10 | Must be strictly positive ($L > 0$). $L = 1.00\text{ m}$ gives standard "seconds pendulum" behavior ($T \approx 2.0\text{ s}$). |
-| **Pendulum Angle** | $\theta_0$ | deg | $12^\circ$ | $2^\circ$ to $30^\circ$ | $1^\circ$ | Default $12^\circ$ stays safely in small-angle regime ($0.27\%$ error). $30^\circ$ enables nonlinear comparison. |
-| **Gravity** | $g$ | $\text{m/s}^2$ | 9.80 | 1.62 to 24.79 | 0.10 | Presets: Moon (1.62), Earth (9.80), Jupiter (24.79). Validates period gravity dependence. |
-| **Driving Freq** | $\Omega$ | rad/s | 5.00 | 1.00 to 15.00 | 0.20 | Spans across resonance $\omega_0 = \sqrt{25/1} = 5.00\text{ rad/s}$ ($f \approx 0.80\text{ Hz}$). |
-| **Driver Force** | $F_0$ | N | 2.00 | 0.50 to 10.00 | 0.50 | Sufficient force to demonstrate steady-state amplitude without visual clipping. |
+| **Mass** | $m$ | kg | 1.00 | 0.20 to 3.00 | 0.10 | Must be strictly positive ($m > 0$). Capped at $3.0\text{ kg}$ to prevent excessive elongation. |
+| **Spring Constant** | $k$ | N/m | 25.0 | 10.0 to 100.0 | 5.0 | Must be strictly positive ($k > 0$). $25\text{ N/m}$ gives clean, countable period ($T \approx 1.26\text{ s}$). |
+| **Initial Amplitude** | $A$ | m | 0.30 | 0.05 to 0.50 | 0.05 | Validated against ceiling clearance: requires $A < 0.85(L_0 + \Delta l)$. |
+| **Damping Coeff** | $b$ | $\text{N}\cdot\text{s/m}$ | 0.00 | 0.00 to 1.00 | 0.05 | $b \ge 0$. Max $b=1.0$ guarantees $\zeta \le 0.5 < 1$ for default apparatus (underdamped). |
+| **Pendulum Length** | $L$ | m | 1.00 | 0.30 to 2.50 | 0.10 | Must be strictly positive ($L > 0$). $L = 1.00\text{ m}$ gives standard "seconds pendulum" ($T \approx 2.0\text{ s}$). |
+| **Pendulum Angle** | $\theta_0$ | deg | $12^\circ$ | $2^\circ$ to $30^\circ$ | $1^\circ$ | Default $12^\circ$ stays in small-angle regime ($0.27\%$ error). $30^\circ$ enables nonlinear comparison. |
+| **Gravity** | $g$ | $\text{m/s}^2$ | 9.80 | 1.62 to 24.79 | 0.10 | Presets: Moon (1.62), Earth (9.80), Jupiter (24.79). Validates period gravity independence. |
+| **Driving Freq** | $\Omega$ | rad/s | 5.00 | 1.00 to 15.00 | 0.20 | Spans across natural frequency $\omega_0 = \sqrt{25/1} = 5.00\text{ rad/s}$ ($f \approx 0.796\text{ Hz}$). |
+| **Driver Force** | $F_0$ | N | 2.00 | 0.50 to 5.00 | 0.50 | Sufficient force to demonstrate steady-state resonance without visual off-screen excursion. |
 
-### Visual Coordinate Bounds Check for Vertical Spring
-- Ceiling anchor: $y_{\text{anchor}} = 0.20\text{ m}$.
-- Natural length: $L_0 = 0.40\text{ m}$.
-- Static equilibrium: $y_{\text{eq}} = L_0 + \frac{mg}{k}$.
-  - At $m = 1.0\text{ kg}, k = 25\text{ N/m}$: $\Delta l = 0.392\text{ m} \implies y_{\text{eq}} = 0.792\text{ m}$.
-  - Maximum possible extension ($m=5.0\text{ kg}, k=50\text{ N/m}, A=0.4\text{ m}$): $y_{\max} = 0.40 + 0.98 + 0.40 = 1.78\text{ m}$.
-- Camera2D world viewport is scaled to $Y \in [-0.1, 2.0]\text{ m}$, ensuring complete on-screen visibility at all times.
+**Cross-Parameter Validation Clamp:**
+- Static elongation is constrained: $\Delta l = \frac{mg}{k} \le 1.80\text{ m}$. If a user selects an extreme combination (e.g. $m=3.0\text{ kg}$ on Jupiter $g=24.79\text{ m/s}^2$ with $k=10\text{ N/m}$, which would yield $\Delta l = 7.44\text{ m}$), the parameter validator clamps effective elongation to $1.80\text{ m}$ or auto-adjusts $k$ to maintain physical apparatus realism.
+
+---
+
+### 4.3 Coordinate Systems & Explicit Algebraic Transformation
+
+A critical architectural requirement is distinguishing between the **one-dimensional physical spring coordinates** and the **two-dimensional Camera2D world coordinates**:
+
+#### 1. Physical Coordinate System (1D Vertical, Downward-Positive):
+- **Origin ($y=0$):** Rigid ceiling support bracket.
+- **Orientation:** $+y$ points **downward** in the direction of gravity ($\vec{g} = +g \hat{j}_{\text{phys}}$).
+- **Unstretched Spring Position:** $y = L_0$ ($L_0 = 0.40\text{ m}$).
+- **Static Equilibrium Coordinate:**
+  $$y_{\text{eq}} = L_0 + \Delta l = L_0 + \frac{mg}{k}$$
+- **Displacement from Static Equilibrium:**
+  $$x(t) = y(t) - y_{\text{eq}}$$
+  - $x > 0$: Mass is below equilibrium (spring stretched further).
+  - $x < 0$: Mass is above equilibrium (spring partially compressed).
+- **Physical Velocity & Acceleration:**
+  $$v_{\text{phys}}(t) = \dot{x}(t) \quad (\text{downward-positive})$$
+  $$a_{\text{phys}}(t) = \ddot{x}(t) = -\omega_0^2 x(t) - 2\gamma v_{\text{phys}}(t) + \frac{F_{\text{ext}}(t)}{m}$$
+- **Physical Net Restoring Force:**
+  $$F_{\text{restore,phys}} = -kx(t) \quad (\text{upward when } x > 0)$$
+
+#### 2. Camera2D World Coordinate System (2D Cartesian, Upward-Positive):
+- **Orientation:** $+Y$ points **upward**, $+X$ points **rightward** (standard Cartesian convention used by `Camera2D.worldToScreen`).
+- **Ceiling Support Anchor World Position:**
+  $$\vec{P}_{\text{ceiling}} = (X_{\text{anchor}}, Y_{\text{ceiling}}) = (0.0\text{ m}, Y_{\text{top}})$$
+- **Equilibrium World Position:**
+  $$\vec{P}_{\text{eq,world}} = (X_{\text{anchor}}, Y_{\text{ceiling}} - y_{\text{eq}}) = (0.0, Y_{\text{ceiling}} - L_0 - \Delta l)$$
+- **Instantaneous Mass Center World Position:**
+  $$\vec{P}_{\text{mass,world}}(t) = (X_{\text{anchor}}, Y_{\text{ceiling}} - y(t)) = (0.0, Y_{\text{eq,world}} - x(t))$$
+
+#### 3. Vector Arrow Transformation for Visual Rendering:
+Because world $+Y$ is opposite to physical $+y$, vectors are converted as follows:
+- **Velocity Arrow:** $\vec{V}_{\text{world}} = (0, -v_{\text{phys}}(t))$. (When physical velocity is downward $v_{\text{phys}} > 0$, the canvas arrow points downward in world $-Y$).
+- **Acceleration Arrow:** $\vec{A}_{\text{world}} = (0, -a_{\text{phys}}(t))$.
+- **Restoring Force Arrow:** $\vec{F}_{\text{restore,world}} = (0, +kx(t))$. (When physical displacement is downward $x > 0$, restoring force in world points upward $+Y$).
+- **Driving Force Arrow:** $\vec{F}_{\text{drive,world}} = (0, -F_0 \cos(\Omega t))$.
+
+---
+
+### 4.4 Visual Bounds & Dynamic Automatic Camera Fitting
+
+#### Why Fixed Camera Bounds Are Insufficient:
+Across the full parameter domain:
+- Minimum apparatus height: $m=0.2\text{ kg}, k=100\text{ N/m}, g=1.62\text{ m/s}^2 \implies \Delta l = 0.003\text{ m}$. Total length $\approx 0.40\text{ m}$.
+- Maximum standard apparatus height: $m=3.0\text{ kg}, k=15\text{ N/m}, g=9.80\text{ m/s}^2 \implies \Delta l = 1.96\text{ m}$. With amplitude $A=0.4\text{ m}$ and bob dimensions, total length $\approx 2.9\text{ m}$.
+A single static camera view would either shrink small oscillations into unreadable specks or clip large elongations completely off-screen.
+
+#### Automatic Camera Fitting Algorithm:
+The simulation container applies dynamic camera framing whenever parameters change:
+1. Compute peak vertical extent in physical space:
+   $$y_{\min,\text{phys}} = \max(0.05, L_0 + \Delta l - A_{\max})$$
+   $$y_{\max,\text{phys}} = L_0 + \Delta l + A_{\max} + h_{\text{bob}} + h_{\text{margin}}$$
+   where $h_{\text{bob}} = 0.15\text{ m}$ and $h_{\text{margin}} = 0.20\text{ m}$ accounts for vector arrows and measurement labels.
+2. Convert to world bounding box:
+   $$Y_{\text{top,world}} = Y_{\text{ceiling}} + 0.15\text{ m} \quad (\text{includes ceiling bracket})$$
+   $$Y_{\text{bottom,world}} = Y_{\text{ceiling}} - y_{\max,\text{phys}}$$
+3. Center and Zoom Camera2D:
+   $$Y_{\text{center}} = \frac{Y_{\text{top,world}} + Y_{\text{bottom,world}}}{2}$$
+   $$H_{\text{world}} = Y_{\text{top,world}} - Y_{\text{bottom,world}}$$
+   $$\text{camera.setViewportHeight}(H_{\text{world}} \times 1.15) \quad (\text{15\% visual padding})$$
+   $$\text{camera.setCenter}(0.0, Y_{\text{center}})$$
+This guarantees that for every possible parameter configuration, the ceiling bracket, helical spring coils, natural length line, equilibrium line, mass bob, and vector arrows remain perfectly centered, fully visible, and sharply rendered on both 16:9 TV displays and mobile viewports.
 
 ---
 
@@ -394,9 +505,19 @@ A dedicated Vitest test suite will validate physical and numerical correctness:
 
 ### 6. Forced Oscillation & Resonance Verification
 - Verify steady-state amplitude formula $A(\Omega)$ across $\Omega \in [0.5 \omega_0, 2.0 \omega_0]$.
-- Verify resonance peak occurs at $\Omega_{\text{res}} = \sqrt{\omega_0^2 - 2\gamma^2}$.
-- Verify phase lag at natural frequency: $\delta(\omega_0) = \frac{\pi}{2} = 90^\circ$.
-- Verify damping effect on resonance: smaller damping $b$ yields higher $Q$ and taller, narrower resonance peak.
+- **Resonance Peak Existence Condition:**
+  - When $\gamma < \omega_0 / \sqrt{2}$: verify resonance peak occurs at exactly $\Omega_{\text{res}} = \sqrt{\omega_0^2 - 2\gamma^2}$, and $A(\Omega_{\text{res}}) = \frac{F_0}{b\omega_d}$.
+  - When $\gamma \ge \omega_0 / \sqrt{2}$: verify `hasResonancePeak` is false, `resonantFrequency` is null, and maximum amplitude occurs at static load $A(0) = F_0/k$.
+- **Undamped Resonance Handling:**
+  - Verify that when $b=0$, $A(\omega_0)$ evaluates to `Infinity` and is not reported as a finite steady-state value.
+- **Phase Lag via `atan2`:**
+  - Verify $\delta(\Omega) = \operatorname{atan2}(2\gamma\Omega, \omega_0^2 - \Omega^2) \in [0, \pi]$.
+  - Verify $\delta(\omega_0) = \frac{\pi}{2} = 90^\circ$ for any non-zero damping.
+- **Forced Motion Energy Accounting:**
+  - Verify instantaneous conservation balance: $|E_{\text{mech}}(t) - (E_{\text{mech}}(0) + W_{\text{ext}}(t) - E_{\text{diss}}(t))| < 10^{-6}\text{ J}$ using RK4 integration.
+  - Over a full steady-state cycle, verify $W_{\text{ext,cycle}} \approx E_{\text{diss,cycle}} = \pi b \Omega A^2$.
+- **Numerical RK4 Integration vs. Analytical Steady State:**
+  - Verify that after $t > 5/\gamma$, the numerical RK4 forced trajectory converges to the analytical steady-state solution $x_{\text{steady}}(t)$ to within $0.5\%$.
 
 ---
 
