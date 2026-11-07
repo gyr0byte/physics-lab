@@ -47,7 +47,7 @@ object CurriculumData {
     // ── Grade 12 Content Areas (25 Chapters Total) ───────────────────────
 
     private val grade12Areas = listOf(
-        CurriculumArea("Mechanics", topicCount = 3, simulationCount = 0),
+        CurriculumArea("Mechanics", topicCount = 3, simulationCount = 1),
         CurriculumArea("Heat and Thermodynamics", topicCount = 2, simulationCount = 0),
         CurriculumArea("Waves and Optics", topicCount = 8, simulationCount = 0),
         CurriculumArea("Electricity and Magnetism", topicCount = 6, simulationCount = 0),
@@ -98,7 +98,7 @@ object CurriculumData {
         // Grade 12
         "12:Mechanics" to listOf(
             CurriculumTopic("Rotational Dynamics", emptyList()),
-            CurriculumTopic("Periodic Motion", emptyList()),
+            CurriculumTopic("Periodic Motion", listOf("simple-harmonic-motion")),
             CurriculumTopic("Fluid Mechanics", emptyList()),
         ),
         "12:Heat and Thermodynamics" to listOf(

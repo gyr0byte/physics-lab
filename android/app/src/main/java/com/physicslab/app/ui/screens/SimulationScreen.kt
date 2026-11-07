@@ -110,7 +110,7 @@ fun SimulationScreen(
                     webChromeClient = object : WebChromeClient() {
                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                             if (consoleMessage != null) {
-                                Log.d(
+                                Log.i(
                                     "SimulationWebView",
                                     "${consoleMessage.messageLevel()}: ${consoleMessage.message()} (line ${consoleMessage.lineNumber()} of ${consoleMessage.sourceId()})"
                                 )

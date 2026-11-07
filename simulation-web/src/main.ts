@@ -56,10 +56,8 @@ function loadSimulationFromHash(): void {
     activeSimulation = entry.create();
     activeSimulation.initialize(container);
 
-    if (import.meta.env.DEV) {
-      (window as unknown as Record<string, unknown>)['__simulation'] = activeSimulation;
-      (window as unknown as Record<string, unknown>)['__simulationRegistry'] = simulationRegistry;
-    }
+    (window as unknown as Record<string, unknown>)['__simulation'] = activeSimulation;
+    (window as unknown as Record<string, unknown>)['__simulationRegistry'] = simulationRegistry;
   }
 }
 

@@ -115,6 +115,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
   private _rafId: number = 0;
   private _boundTick = this.tick.bind(this);
   private _resizeListener: (() => void) | null = null;
+  private _resizeObserver: ResizeObserver | null = null;
 
   initialize(container: HTMLElement): void {
     this._container = container;
@@ -331,6 +332,12 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
     // Resize handling
     this._resizeListener = this._handleResize.bind(this);
     window.addEventListener('resize', this._resizeListener);
+    if (typeof ResizeObserver !== 'undefined' && canvasContainer) {
+      this._resizeObserver = new ResizeObserver(() => {
+        this._handleResize();
+      });
+      this._resizeObserver.observe(canvasContainer);
+    }
     this._handleResize();
 
     // Rebuild controls for initial mode
@@ -406,21 +413,27 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
   }
 
   private _handleResize(): void {
-    if (!this._canvas) return;
-    const rect = this._canvas.parentElement?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    if (!this._canvas || !this._canvas.parentElement) return;
+    const rect = this._canvas.parentElement.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      requestAnimationFrame(() => this._handleResize());
+      return;
+    }
 
     const dpr = window.devicePixelRatio || 1;
     this._canvas.width = rect.width * dpr;
     this._canvas.height = rect.height * dpr;
+    this._ctx.scale(dpr, dpr);
 
     this._camera.resize(rect.width, rect.height);
     this._updateCameraFraming();
+    this._render();
   }
 
   private _updateCameraFraming(): void {
-    const w = this._canvas.width / (window.devicePixelRatio || 1);
-    const h = this._canvas.height / (window.devicePixelRatio || 1);
+    const w = this._camera.canvasWidth;
+    const h = this._camera.canvasHeight;
+    if (w <= 0 || h <= 0) return;
 
     if (this._apparatus === 'horizontal-spring') {
       // Horizontal Air Track Framing:
@@ -433,6 +446,11 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
       const originX = w * 0.50 - bounds.centerX * scale;
       const originY = h * 0.50 + bounds.centerY * scale;
       this._camera.setOrigin(originX, originY);
+    } else if (this._apparatus === 'pendulum') {
+      const L = this._pendulumParams.length;
+      const scale = (h * 0.70) / (L + 0.30);
+      this._camera.setScale(scale);
+      this._camera.setOrigin(w * 0.50, h * 0.15);
     } else {
       // Vertical Spring / Pendulum Framing:
       // Ceiling anchor at Y = 0.00 m, hangs downward into -Y
@@ -445,8 +463,8 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
       const scale = (h * 0.75) / bounds.viewportHeight;
       this._camera.setScale(scale);
 
-      const originX = w * 0.40;
-      const originY = h * 0.20;
+      const originX = w * 0.50;
+      const originY = h * 0.15;
       this._camera.setOrigin(originX, originY);
     }
   }
@@ -685,6 +703,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
 
   start(): void {
     this._running = true;
+    this._clock.start();
     if (this._statusPill) {
       this._statusPill.textContent = 'RUNNING';
       this._statusPill.style.background = 'rgba(76, 175, 80, 0.2)';
@@ -695,6 +714,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
 
   pause(): void {
     this._running = false;
+    this._clock.pause();
     if (this._statusPill) {
       this._statusPill.textContent = 'PAUSED';
       this._statusPill.style.background = 'rgba(255, 152, 0, 0.2)';
@@ -757,7 +777,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
             this._clock.elapsed
           );
 
-          if (this._graph && this._clock.elapsed % 0.05 < dt) {
+          if (this._graph) {
             this._graph.pushData(this._dispSeriesIndex, this._clock.elapsed, this._pendulumState.angleDeg);
             this._graph.pushData(this._velSeriesIndex, this._clock.elapsed, this._pendulumState.linearVelocity);
           }
@@ -770,7 +790,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
               dt
             );
 
-            if (this._graph && this._clock.elapsed % 0.05 < dt) {
+            if (this._graph) {
               this._graph.pushData(this._dispSeriesIndex, this._clock.elapsed, this._forcedState.displacement);
               this._graph.pushData(this._velSeriesIndex, this._clock.elapsed, this._forcedState.velocity);
             }
@@ -781,7 +801,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
             this._clock.elapsed
           );
 
-          if (this._graph && this._clock.elapsed % 0.05 < dt) {
+          if (this._graph) {
             this._graph.pushData(this._dispSeriesIndex, this._clock.elapsed, this._dampedState.displacement);
             this._graph.pushData(this._velSeriesIndex, this._clock.elapsed, this._dampedState.velocity);
           }
@@ -792,7 +812,7 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
             this._clock.elapsed
           );
 
-          if (this._graph && this._clock.elapsed % 0.05 < dt) {
+          if (this._graph) {
             this._graph.pushData(this._dispSeriesIndex, this._clock.elapsed, this._freeState.displacement);
             this._graph.pushData(this._velSeriesIndex, this._clock.elapsed, this._freeState.velocity);
           }
@@ -808,8 +828,8 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
 
   private _render(): void {
     const ctx = this._ctx;
-    const w = this._canvas.width / (window.devicePixelRatio || 1);
-    const h = this._canvas.height / (window.devicePixelRatio || 1);
+    const w = this._camera.canvasWidth;
+    const h = this._camera.canvasHeight;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -1080,6 +1100,11 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
     }
     if (this._resizeListener) {
       window.removeEventListener('resize', this._resizeListener);
+      this._resizeListener = null;
+    }
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
     }
     if (this._graph) {
       this._graph.dispose();
