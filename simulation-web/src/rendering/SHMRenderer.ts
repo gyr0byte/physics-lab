@@ -433,7 +433,7 @@ export function drawVerticalSpringApparatus(
     ctx.textAlign = 'left';
     ctx.fillText(`Natural Length L₀ = ${naturalLength.toFixed(2)} m`, pNatRight.x + 8, pNatRight.y + 4);
 
-    // Static Equilibrium reference line: Y_eq
+    // Static Equilibrium reference line: Y_eq (mass center)
     const eqY = transform.worldEquilibriumY;
     const pEqLeft = camera.worldToScreen(new Vector2(-1.0, eqY));
     const pEqRight = camera.worldToScreen(new Vector2(1.0, eqY));
@@ -444,16 +444,16 @@ export function drawVerticalSpringApparatus(
     ctx.stroke();
 
     ctx.fillStyle = '#FFD54F';
-    ctx.fillText(`Equilibrium (y_eq = -${(naturalLength + staticElongation).toFixed(2)} m)`, pEqRight.x + 8, pEqRight.y + 4);
+    ctx.fillText(`Equilibrium Mass Center (Y_eq = ${eqY.toFixed(2)} m)`, pEqRight.x + 8, pEqRight.y + 4);
 
     ctx.restore();
   }
 
   // 3. Coiled Spring
   // Spring top: (0, ceilingWorldY)
-  // Spring bottom: top eyelet of suspended mass at (0, worldPositionY + blockHeight / 2)
+  // Spring bottom: attaches to top face of suspended mass block at (0, worldAttachmentY)
   const springStart = new Vector2(0, ceilingWorldY);
-  const springEnd = new Vector2(0, transform.worldPositionY + blockHeight / 2);
+  const springEnd = new Vector2(0, transform.worldAttachmentY);
   drawCoiledSpring(ctx, camera, springStart, springEnd, {
     numCoils: 12,
     coilRadiusWorld: 0.06,
@@ -864,8 +864,8 @@ export function drawTravelLimitBanner(
   canvasWidth: number
 ): void {
   ctx.save();
-  const bannerWidth = Math.min(680, canvasWidth - 40);
-  const bannerHeight = 60;
+  const bannerWidth = Math.min(740, canvasWidth - 40);
+  const bannerHeight = 64;
   const bannerX = (canvasWidth - bannerWidth) / 2;
   const bannerY = 16;
 
@@ -882,11 +882,11 @@ export function drawTravelLimitBanner(
   ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText('⚠️ APPARATUS TRAVEL LIMIT EXCEEDED (|x| > 2.40 m)', canvasWidth / 2, bannerY + 10);
+  ctx.fillText('⚠️ APPARATUS TRAVEL LIMIT EXCEEDED (x < -2.40 m or x > +3.00 m)', canvasWidth / 2, bannerY + 10);
 
   ctx.fillStyle = '#FFEBEE';
   ctx.font = '12px system-ui, -apple-system, sans-serif';
-  ctx.fillText('Simulation halted to protect physical apparatus. Model state preserved. Press Reset.', canvasWidth / 2, bannerY + 34);
+  ctx.fillText('Simulation halted to protect physical apparatus. Model state preserved. Press Reset.', canvasWidth / 2, bannerY + 36);
 
   ctx.restore();
 }

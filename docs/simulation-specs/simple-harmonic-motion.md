@@ -387,13 +387,22 @@ All user-adjustable controls enforce strict validation boundaries:
 A critical architectural requirement is distinguishing between the **one-dimensional physical spring coordinates** and the **two-dimensional Camera2D world coordinates**:
 
 #### 1. Vertical Apparatus Coordinate System (1D Vertical, Downward-Positive):
-- **Origin ($y=0$):** Rigid ceiling support bracket.
+- **Origin ($y=0$):** Rigid ceiling support bracket ($Y_{\text{ceiling}} = 0.00\text{ m}$).
 - **Orientation:** $+y$ points **downward** in the direction of gravity ($\vec{g} = +g \hat{j}_{\text{phys}}$).
-- **Unstretched Spring Position:** $y = L_0$ ($L_0 = 0.40\text{ m}$).
-- **Static Equilibrium Coordinate:**
-  $$y_{\text{eq}} = L_0 + \Delta l = L_0 + \frac{mg}{k}$$
+- **Spring Attachment & Geometry Reference:**
+  - The helical spring attaches between the rigid ceiling bracket ($Y_{\text{ceiling}} = 0.00\text{ m}$) and the **top face** of the suspended mass block of height $h_{\text{block}} = 0.16\text{ m}$.
+  - Instantaneous physical spring length:
+    $$L(x) = L_0 + \Delta l + x(t) = 0.40 + \frac{mg}{k} + x(t)$$
+  - Unstretched Spring Endpoint: $Y = Y_{\text{ceiling}} - L_0 = -0.40\text{ m}$ (where unstretched spring hangs without mass).
+  - Static Equilibrium Spring Length: $L_{\text{eq}} = L_0 + \Delta l = 0.40 + 0.392 = 0.792\text{ m}$ (for $m=1\text{ kg}, k=25\text{ N/m}$).
+  - Spring attachment point (top face of block):
+    $$Y_{\text{attachment}}(t) = Y_{\text{block,top}}(t) = Y_{\text{ceiling}} - L(x(t)) = -(L_0 + \Delta l + x(t))$$
+  - Center of mass block:
+    $$Y_{\text{block,center}}(t) = Y_{\text{attachment}}(t) - \frac{h_{\text{block}}}{2} = -\left(L_0 + \Delta l + \frac{h_{\text{block}}}{2}\right) - x(t)$$
+  - Static Equilibrium Mass Center ($x = 0$):
+    $$Y_{\text{eq,center}} = -\left(L_0 + \Delta l + \frac{h_{\text{block}}}{2}\right) = -(0.40 + 0.392 + 0.08) = -0.872\text{ m}$$
 - **Displacement from Static Equilibrium:**
-  $$x(t) = y(t) - y_{\text{eq}}$$
+  $$x(t) = Y_{\text{eq,center}} - Y_{\text{block,center}}(t) \quad (\text{downward-positive})$$
   - $x > 0$: Mass is below equilibrium (spring stretched further).
   - $x < 0$: Mass is above equilibrium (spring compressed toward solid height $L_{\text{solid}} = 0.10\text{ m}$).
 - **Physical Velocity & Acceleration:**
@@ -452,10 +461,16 @@ A critical architectural requirement is distinguishing between the **one-dimensi
 
 #### 3. Camera2D World Coordinate System Transformations:
 - **Vertical Apparatus to World:**
-  $$\vec{P}_{\text{ceiling}} = (0.0\text{ m}, Y_{\text{top}})$$
-  $$\vec{P}_{\text{mass,world}}(t) = (0.0, Y_{\text{ceiling}} - (L_0 + \Delta l + x(t)))$$
+  $$\vec{P}_{\text{ceiling}} = (0.0\text{ m}, Y_{\text{ceiling}})$$
+  $$\vec{P}_{\text{attachment,world}}(t) = (0.0, Y_{\text{ceiling}} - (L_0 + \Delta l + x(t)))$$
+  $$\vec{P}_{\text{mass,center,world}}(t) = \left(0.0, Y_{\text{ceiling}} - \left(L_0 + \Delta l + \frac{h_{\text{block}}}{2}\right) - x(t)\right)$$
+  $$Y_{\text{eq,center}} = Y_{\text{ceiling}} - \left(L_0 + \Delta l + \frac{h_{\text{block}}}{2}\right) = -0.872\text{ m}$$
   $$\vec{V}_{\text{world}} = (0, -v_{\text{phys}}(t))$$
   $$\vec{F}_{\text{restore,world}} = (0, +kx(t))$$
+- **Simple Pendulum to World:**
+  $$\vec{P}_{\text{pivot}} = (0.0\text{ m}, 0.0\text{ m})$$
+  $$\vec{P}_{\text{bob,world}}(t) = (L \sin\theta(t), -L \cos\theta(t))$$
+  $$\text{At } \theta = 30^\circ, L = 1.0\text{ m} \implies (0.500\text{ m}, -0.866\text{ m})$$
 - **Horizontal Apparatus to World:**
   $$\vec{P}_{\text{wall}} = (X_{\text{wall}}, Y_{\text{track}})$$
   $$\vec{P}_{\text{attachment,world}}(t) = (X_{\text{wall}} + L_{0,h} + x(t), Y_{\text{track}})$$

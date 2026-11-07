@@ -270,10 +270,18 @@ export interface PendulumState {
  * Transformation from 1D vertical physical coordinates to 2D Camera2D world coordinates.
  */
 export interface VerticalWorldTransform {
-  /** World Y coordinate of static equilibrium line */
+  /** World Y coordinate of static equilibrium mass center: ceilingY - (L0 + deltaL + blockHeight / 2) */
   worldEquilibriumY: number;
-  /** World Y coordinate of suspended mass center */
+  /** World Y coordinate of spring attachment point on the block's top face: ceilingY - L(x) */
+  worldAttachmentY: number;
+  /** World Y coordinate of suspended mass center: blockTopY - blockHeight / 2 */
   worldPositionY: number;
+  /** World Y coordinate of block's top face */
+  worldBlockTopY: number;
+  /** World Y coordinate of block's bottom face */
+  worldBlockBottomY: number;
+  /** Instantaneous physical spring length in meters: L(x) = L0 + deltaL + x */
+  springLength: number;
   /** World Y component of velocity vector (points opposite physical velocity) */
   worldVelocityY: number;
   /** World Y component of acceleration vector */
@@ -323,6 +331,9 @@ export const MAX_STATIC_ELONGATION = 1.80;
 
 /** Minimum compressed spring length (solid height in meters) */
 export const SPRING_SOLID_HEIGHT = 0.10;
+
+/** Height of the suspended mass block on the vertical spring apparatus in meters */
+export const VERTICAL_BLOCK_HEIGHT = 0.16;
 
 // ============================================================================
 // Horizontal Air Track Apparatus Geometry
@@ -597,8 +608,12 @@ export interface TrajectoryValidationOptions {
   duration?: number;
   /** Integration timestep in seconds (default: 0.002 s) */
   dt?: number;
-  /** Maximum allowable displacement travel limit in meters (default: HORIZONTAL_MAX_TRAVEL = 2.40 m) */
+  /** Optional symmetric travel limit in meters (default: HORIZONTAL_MAX_TRAVEL = 2.40 m) */
   travelLimit?: number;
+  /** Minimum allowable displacement limit (default: -HORIZONTAL_MAX_COMPRESSION = -2.40 m) */
+  minDisplacement?: number;
+  /** Maximum allowable displacement limit (default: +HORIZONTAL_MAX_EXTENSION = +3.00 m) */
+  maxDisplacement?: number;
 }
 
 /**
@@ -621,6 +636,8 @@ export function validateForcedTrajectory(
   driver: ForcedDriverParams,
   options?: TrajectoryValidationOptions
 ): TrajectoryValidationResult {
+  const minDisp = options?.minDisplacement ?? (options?.travelLimit !== undefined ? -options.travelLimit : -HORIZONTAL_MAX_COMPRESSION);
+  const maxDisp = options?.maxDisplacement ?? (options?.travelLimit !== undefined ? options.travelLimit : HORIZONTAL_MAX_EXTENSION);
   const travelLimit = options?.travelLimit ?? HORIZONTAL_MAX_TRAVEL;
   const duration = options?.duration ?? 60.0;
   const dt = options?.dt ?? 0.002;
@@ -678,10 +695,10 @@ export function validateForcedTrajectory(
       peakDisplacement = absX;
     }
 
-    if (absX > travelLimit && exceededAtTime === null) {
+    if ((x < minDisp || x > maxDisp) && exceededAtTime === null) {
       exceededAtTime = t;
       errors.push(
-        `Trajectory excursion (${absX.toFixed(2)} m) exceeds horizontal apparatus travel limit (${travelLimit.toFixed(2)} m) at t = ${t.toFixed(2)} s.`
+        `Trajectory excursion (${x.toFixed(2)} m) exceeds horizontal apparatus travel limits [${minDisp.toFixed(2)} m, +${maxDisp.toFixed(2)} m] at t = ${t.toFixed(2)} s.`
       );
       break; // apparatus limit exceeded
     }
@@ -1258,9 +1275,14 @@ export function stepForcedOscillatorRK4(
   params: SpringParams,
   driver: ForcedDriverParams,
   dt: number,
-  options?: { travelLimit?: number }
+  options?: {
+    travelLimit?: number;
+    minDisplacement?: number;
+    maxDisplacement?: number;
+  }
 ): ForcedIntegrationState {
-  const travelLimit = options?.travelLimit ?? HORIZONTAL_MAX_TRAVEL;
+  const minDisp = options?.minDisplacement ?? (options?.travelLimit !== undefined ? -options.travelLimit : -HORIZONTAL_MAX_COMPRESSION);
+  const maxDisp = options?.maxDisplacement ?? (options?.travelLimit !== undefined ? options.travelLimit : HORIZONTAL_MAX_EXTENSION);
 
   // If simulation has already halted due to exceeded apparatus travel limit, stay halted
   if (state.apparatusStatus === 'exceeded') {
@@ -1326,14 +1348,14 @@ export function stepForcedOscillatorRK4(
   const prevPeak = state.peakDisplacement ?? Math.abs(x0);
   const newPeak = Math.max(prevPeak, absDisplacement);
 
-  if (absDisplacement > travelLimit) {
+  if (newX < minDisp || newX > maxDisp) {
     // The prospective integration step to newX would exceed the physical travel limit.
     // Terminate the simulation model: preserve the last valid physical state without
     // fabricating a zero-velocity resting collision state, and set apparatusStatus = 'exceeded'.
     return {
       ...state,
       apparatusStatus: 'exceeded',
-      peakDisplacement: Math.max(state.peakDisplacement ?? Math.abs(x0), Math.abs(x0)),
+      peakDisplacement: Math.max(state.peakDisplacement ?? Math.abs(x0), Math.abs(newX)),
     };
   }
 
@@ -1482,8 +1504,9 @@ export function stepNonlinearPendulumRK4(
  * World system (Camera2D):
  * - Upward direction is positive (+Y)
  * - Ceiling anchor at (0, ceilingWorldY)
- * - World Equilibrium: Y_eq = ceilingWorldY - (L0 + Δl)
- * - World Mass Center: Y_mass = Y_eq - x
+ * - Spring attaches to the top face of the block: Y_attachment = ceilingWorldY - (L0 + Δl + x)
+ * - World Mass Center: Y_mass = Y_attachment - blockHeight / 2 = ceilingWorldY - (L0 + Δl + blockHeight / 2) - x
+ * - World Equilibrium Mass Center: Y_eq = ceilingWorldY - (L0 + Δl + blockHeight / 2)
  * - World Velocity Vector: (0, -v_phys)
  * - World Acceleration Vector: (0, -a_phys)
  * - World Restoring Force Vector: (0, +k·x) (points upward when stretched downward)
@@ -1497,6 +1520,7 @@ export function transformToWorldCoordinates(physical: {
   acceleration: number;
   restoringForce: number;
   drivingForce?: number;
+  blockHeight?: number;
 }): VerticalWorldTransform {
   const {
     ceilingWorldY,
@@ -1506,14 +1530,28 @@ export function transformToWorldCoordinates(physical: {
     velocity,
     acceleration,
     drivingForce = 0,
+    blockHeight = VERTICAL_BLOCK_HEIGHT,
   } = physical;
 
-  const worldEquilibriumY = ceilingWorldY - (naturalLength + staticElongation);
-  const worldPositionY = worldEquilibriumY - displacement;
+  // Actual physical spring length: L(x) = L0 + deltaL + x (where +x is downward displacement)
+  const springLength = naturalLength + staticElongation + displacement;
+
+  // Spring attaches to the top face of the suspended mass block
+  const worldAttachmentY = ceilingWorldY - springLength;
+  const worldBlockTopY = worldAttachmentY;
+  const worldPositionY = worldBlockTopY - blockHeight / 2.0;
+  const worldBlockBottomY = worldBlockTopY - blockHeight;
+
+  // Static equilibrium position of the mass center (at x = 0)
+  const worldEquilibriumY = ceilingWorldY - (naturalLength + staticElongation + blockHeight / 2.0);
 
   return {
     worldEquilibriumY,
+    worldAttachmentY,
     worldPositionY,
+    worldBlockTopY,
+    worldBlockBottomY,
+    springLength,
     worldVelocityY: -velocity,
     worldAccelerationY: -acceleration,
     worldRestoringForceY: -physical.restoringForce, // Restoring force opposes displacement: if x > 0 (down), force is up (+Y)
@@ -1529,18 +1567,18 @@ export function computeAutoCameraBounds(
   ceilingWorldY: number,
   naturalLength: number,
   staticElongation: number,
-  peakAmplitude: number
+  peakAmplitude: number,
+  blockHeight: number = VERTICAL_BLOCK_HEIGHT
 ): {
   centerY: number;
   viewportHeight: number;
   minY: number;
   maxY: number;
 } {
-  const bobHeight = 0.15; // meters
   const margin = 0.20; // meters for arrows and text labels
 
   const maxY = ceilingWorldY + 0.15; // includes ceiling mount bracket
-  const minY = ceilingWorldY - (naturalLength + staticElongation + peakAmplitude + bobHeight + margin);
+  const minY = ceilingWorldY - (naturalLength + staticElongation + blockHeight + peakAmplitude + margin);
 
   const viewportHeight = (maxY - minY) * 1.15; // 15% visual padding
   const centerY = (maxY + minY) / 2.0;

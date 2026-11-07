@@ -33,7 +33,7 @@ function loadSimulationFromHash(): void {
   }
 
   const rawHash = window.location.hash.replace(/^#/, '').trim();
-  const simId = rawHash || 'projectile-motion';
+  const simId = rawHash.split('?')[0] || 'projectile-motion';
 
   // If a simulation is already running, cleanly dispose it
   if (activeSimulation) {

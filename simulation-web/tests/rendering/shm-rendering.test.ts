@@ -114,20 +114,32 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
         velocity: -0.5,
         acceleration: -5.0,
         restoringForce: -5.0, // F_s = -k·x = -25 * 0.2 = -5 N
+        blockHeight,
       });
 
       // Verification of physical coordinates
-      const expectedEqY = ceilingWorldY - (naturalLength + staticElongation); // -0.792 m
-      const expectedMassY = expectedEqY - displacement; // -0.992 m
-      expect(transform.worldEquilibriumY).toBeCloseTo(expectedEqY, 4);
-      expect(transform.worldPositionY).toBeCloseTo(expectedMassY, 4);
+      // Actual spring length at equilibrium: L0 + deltaL = 0.40 + 0.392 = 0.792 m
+      // Instantaneous spring length: L(x) = 0.792 + 0.20 = 0.992 m
+      expect(transform.springLength).toBeCloseTo(0.992, 4);
+
+      // Spring attaches to the top face of the block: Y_attachment = ceilingWorldY - L(x) = 0 - 0.992 = -0.992 m
+      expect(transform.worldAttachmentY).toBeCloseTo(-0.992, 4);
+      expect(transform.worldBlockTopY).toBeCloseTo(-0.992, 4);
+
+      // Mass center is offset by half block height (0.16 / 2 = 0.08 m):
+      // Y_mass = -0.992 - 0.08 = -1.072 m
+      expect(transform.worldPositionY).toBeCloseTo(-1.072, 4);
+
+      // Equilibrium mass center (x = 0): Y_eq = -(0.40 + 0.392 + 0.08) = -0.872 m
+      expect(transform.worldEquilibriumY).toBeCloseTo(-0.872, 4);
+      expect(transform.worldBlockBottomY).toBeCloseTo(-1.152, 4);
 
       // Spring top must be at the ceiling support anchor (0, ceilingWorldY)
-      // Spring bottom must attach to top eyelet of suspended block: (0, worldPositionY + blockHeight / 2)
+      // Spring bottom must attach to top face of suspended block: (0, transform.worldAttachmentY)
       const springTopWorld = new Vector2(0, ceilingWorldY);
-      const springBottomWorld = new Vector2(0, transform.worldPositionY + blockHeight / 2);
+      const springBottomWorld = new Vector2(0, transform.worldAttachmentY);
       expect(springTopWorld.y).toBe(0.00);
-      expect(springBottomWorld.y).toBeCloseTo(-0.992 + 0.08, 4); // -0.912 m
+      expect(springBottomWorld.y).toBeCloseTo(-0.992, 4);
 
       // Screen transformation verification
       const screenTop = camera.worldToScreen(springTopWorld);
@@ -154,6 +166,7 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
       const naturalLength = 0.40;
       const staticElongation = 0.392;
       const displacement = -0.30; // 0.30 m above static equilibrium (compression)
+      const blockHeight = 0.16;
 
       const transform = transformToWorldCoordinates({
         ceilingWorldY,
@@ -163,11 +176,18 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
         velocity: 1.2,
         acceleration: 7.5,
         restoringForce: 7.5, // F_s = -k·(-0.3) = +7.5 N (downward restoring)
+        blockHeight,
       });
 
-      // Mass center is higher than equilibrium: Y_mass > Y_eq
+      // Spring length: L(x) = 0.40 + 0.392 - 0.30 = 0.492 m
+      expect(transform.springLength).toBeCloseTo(0.492, 4);
+      expect(transform.worldAttachmentY).toBeCloseTo(-0.492, 4);
+      expect(transform.worldPositionY).toBeCloseTo(-0.572, 4); // Mass center at -0.572 m
+
+      // Mass center is higher than equilibrium: Y_mass > Y_eq (-0.572 > -0.872)
       expect(transform.worldPositionY).toBeGreaterThan(transform.worldEquilibriumY);
-      expect(transform.worldPositionY).toBeCloseTo(-0.792 - (-0.30), 4); // -0.492 m
+      expect(transform.worldEquilibriumY).toBeCloseTo(-0.872, 4);
+
       // Restoring force in world points downward (-Y) towards equilibrium:
       expect(transform.worldRestoringForceY).toBeCloseTo(-7.5, 4);
 
@@ -179,6 +199,7 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
         mass: 1.0,
         springConstant: 25.0,
         displacement,
+        blockHeight,
       });
       expect(ctx._calls.length).toBeGreaterThan(10);
     });
@@ -307,7 +328,7 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
   // ── 4. Pendulum Pivot and Bob Coordinates ───────────────────
   describe('4. Pendulum Pivot and Bob Coordinates', () => {
     it('computes bob position from polar coordinates and draws circular bob and suspension cord', () => {
-      const pivotWorld = new Vector2(0.00, 2.00);
+      const pivotWorld = new Vector2(0.00, 0.00);
       const length = 1.00; // 1 meter
       const thetaDeg = 30; // 30 degrees deflection
       const thetaRad = (thetaDeg * Math.PI) / 180;
@@ -327,12 +348,12 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
       };
 
       // Expected world coordinates of bob center:
-      // X_bob = X_pivot + L * sin(theta) = 0 + 1.0 * sin(30°) = 0.50 m
-      // Y_bob = Y_pivot - L * cos(theta) = 2.0 - 1.0 * cos(30°) = 2.0 - 0.8660 = 1.1340 m
+      // X_bob = X_pivot + L * sin(theta) = 0 + 1.0 * sin(30°) = 0.500 m
+      // Y_bob = Y_pivot - L * cos(theta) = 0 - 1.0 * cos(30°) = -0.866 m
       const expectedBobX = pivotWorld.x + length * Math.sin(thetaRad);
       const expectedBobY = pivotWorld.y - length * Math.cos(thetaRad);
-      expect(expectedBobX).toBeCloseTo(0.50, 4);
-      expect(expectedBobY).toBeCloseTo(1.134, 4);
+      expect(expectedBobX).toBeCloseTo(0.500, 3);
+      expect(expectedBobY).toBeCloseTo(-0.866, 3);
 
       const ctx = createMockContext();
       drawPendulumApparatus(ctx, camera, pendulumState, {
@@ -355,6 +376,18 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
         (c) => Math.abs((c.args[0] as number) - bobScreen.x) < 2 && Math.abs((c.args[1] as number) - bobScreen.y) < 2
       );
       expect(hasBobArc).toBe(true);
+    });
+
+    it('verifies pendulum bob position at pivot (0, 0) and 30 degrees deflection is exactly (0.500, -0.866) m', () => {
+      const pivotWorld = new Vector2(0.00, 0.00);
+      const length = 1.00;
+      const thetaRad = (30 * Math.PI) / 180;
+
+      const bobX = pivotWorld.x + length * Math.sin(thetaRad);
+      const bobY = pivotWorld.y - length * Math.cos(thetaRad);
+
+      expect(bobX).toBeCloseTo(0.500, 3);
+      expect(bobY).toBeCloseTo(-0.866, 3);
     });
   });
 
@@ -565,13 +598,13 @@ describe('SHMRenderer — Canvas Rendering Extensions', () => {
       }
     });
 
-    it('drawTravelLimitBanner directly draws high-contrast banner with correct dimensions', () => {
+    it('drawTravelLimitBanner directly draws high-contrast banner with correct dimensions and asymmetric limits', () => {
       const ctx = createMockContext();
       drawTravelLimitBanner(ctx, 1280);
 
       const textCalls = ctx._calls.filter((c) => c.method === 'fillText');
       expect(textCalls.length).toBe(2);
-      expect(textCalls[0]?.args[0]).toContain('APPARATUS TRAVEL LIMIT EXCEEDED');
+      expect(textCalls[0]?.args[0]).toContain('APPARATUS TRAVEL LIMIT EXCEEDED (x < -2.40 m or x > +3.00 m)');
       expect(textCalls[1]?.args[0]).toContain('Simulation halted to protect physical apparatus');
     });
   });

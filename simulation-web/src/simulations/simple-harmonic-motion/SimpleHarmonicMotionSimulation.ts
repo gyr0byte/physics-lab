@@ -337,6 +337,44 @@ export class SimpleHarmonicMotionSimulation implements Simulation {
     this._rebuildControls();
     this.reset();
 
+    // Check URL parameters for direct QA navigation
+    const hash = window.location.hash;
+    if (hash.includes('mode=damped')) {
+      this._setMode('damped');
+    } else if (hash.includes('mode=forced')) {
+      this._setMode('forced');
+    } else if (hash.includes('mode=resonance')) {
+      this._setMode('resonance');
+    } else {
+      this._setMode('free');
+    }
+
+    if (hash.includes('apparatus=pendulum')) {
+      this._apparatus = 'pendulum';
+      const appSelect = document.querySelector('#apparatus-selector select') as HTMLSelectElement | null;
+      if (appSelect) appSelect.value = 'pendulum';
+      this._updateCameraFraming();
+      this.reset();
+    } else if (hash.includes('apparatus=horizontal-spring')) {
+      this._apparatus = 'horizontal-spring';
+      const appSelect = document.querySelector('#apparatus-selector select') as HTMLSelectElement | null;
+      if (appSelect) appSelect.value = 'horizontal-spring';
+      this._updateCameraFraming();
+      this.reset();
+    }
+
+    if (hash.includes('status=exceeded')) {
+      this._forcedState.apparatusStatus = 'exceeded';
+      this._forcedState.displacement = 2.45;
+      this._forcedState.velocity = 1.8;
+      this._forcedState.acceleration = -61.25;
+      this._forcedState.drivingForce = 1.5;
+    }
+
+    if (hash.includes('autostart=1')) {
+      this.start();
+    }
+
     // Start render loop
     this._rafId = requestAnimationFrame(this._boundTick);
   }

@@ -961,7 +961,7 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
   // Suite 8: Coordinate Systems & Auto Camera Bounds
   // ==========================================================================
   describe('8. Coordinate Systems & Auto Camera Bounds', () => {
-    it('correctly maps downward physical coordinates to upward world coordinates', () => {
+    it('correctly maps downward physical coordinates to upward world coordinates with top-face attachment', () => {
       const transform = transformToWorldCoordinates({
         ceilingWorldY: 2.0,
         naturalLength: 0.40,
@@ -973,8 +973,16 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
         drivingForce: 2.0,
       });
 
-      expect(transform.worldEquilibriumY).toBeCloseTo(1.208, 3);
-      expect(transform.worldPositionY).toBeCloseTo(1.008, 3);
+      // Spring length: L(x) = L0 + deltaL + x = 0.40 + 0.392 + 0.20 = 0.992 m
+      expect(transform.springLength).toBeCloseTo(0.992, 3);
+      // Spring attaches to block top face: Y_attachment = 2.0 - 0.992 = 1.008 m
+      expect(transform.worldAttachmentY).toBeCloseTo(1.008, 3);
+      expect(transform.worldBlockTopY).toBeCloseTo(1.008, 3);
+      // Mass center is offset by half block height (0.16 / 2 = 0.08 m):
+      expect(transform.worldPositionY).toBeCloseTo(0.928, 3);
+      // Equilibrium mass center: 2.0 - (0.40 + 0.392 + 0.08) = 1.128 m
+      expect(transform.worldEquilibriumY).toBeCloseTo(1.128, 3);
+      expect(transform.worldBlockBottomY).toBeCloseTo(0.848, 3);
       expect(transform.worldVelocityY).toBe(-1.5);
       expect(transform.worldRestoringForceY).toBe(5.0);
     });
