@@ -771,6 +771,24 @@ describe('SimpleHarmonicPhysics — Official Nepal CDC Grade 12 Chapter 2', () =
       expect(dampedCurve.some(p => p.isSingularity === true)).toBe(false);
     });
 
+    it('verifies displacement resonance peak frequency is calculated independently from natural frequency', () => {
+      // Default parameters: m = 1.0 kg, k = 25.0 N/m, b = 0.20 N·s/m, F0 = 2.0 N
+      const params = { mass: 1.0, springConstant: 25.0, initialDisplacement: 0, dampingCoefficient: 0.20 };
+      const { omega0 } = computeSpringNaturalFrequencies(params.mass, params.springConstant);
+      expect(omega0).toBeCloseTo(5.000, 6);
+
+      const peakInfo = computeResonancePeak(params, 2.0);
+      expect(peakInfo.hasResonancePeak).toBe(true);
+      expect(peakInfo.resonantFrequencyRad).toBeDefined();
+
+      // omega0 = 5.0, gamma = b/(2m) = 0.10
+      // omegaRes = sqrt(omega0^2 - 2*gamma^2) = sqrt(25 - 0.02) = sqrt(24.98) ≈ 4.9979995998 rad/s
+      const expectedPeak = Math.sqrt(25.0 - 2.0 * 0.01);
+      expect(peakInfo.resonantFrequencyRad!).toBeCloseTo(expectedPeak, 9);
+      expect(peakInfo.resonantFrequencyRad!).toBeCloseTo(4.998, 3);
+      expect(peakInfo.resonantFrequencyRad!).not.toBe(omega0);
+    });
+
     it('demonstrates persistent beating in undamped forced motion rather than steady state decay', () => {
       // b = 0, F0 = 2.0, Omega = 4.0, omega0 = 5.0
       // Beat frequency = |omega0 - Omega| = 1.0 rad/s => T_beat = 2*pi / 1.0 ≈ 6.283 s

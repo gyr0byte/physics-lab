@@ -29,25 +29,25 @@ Official Nepal CDC curriculum specifications (`docs/curriculum/`) serve strictly
 
 ## Status
 
-**Version 0.1.0** — First vertical slice (Hardened).
+**Version 0.2.0** — Simple Harmonic Motion & Regression Freeze (Verified on Physical Android Hardware).
 
 | Component | Status |
 |-----------|--------|
-| Simulation engine (TypeScript) | ✅ Working (SimulationRegistry, Vector2, SimulationClock, Camera2D, CanvasRenderer) |
+| Simulation engine (TypeScript) | ✅ Working (SimulationRegistry, Vector2, SimulationClock, Camera2D, CanvasRenderer, Graph) |
 | Projectile Motion simulation | ✅ Working (offline font stack, relative asset paths, idempotent loop, 90° robust sampling) |
 | Newton's Second Law simulation | ✅ Working (F_net = m*a, static/kinetic friction, dynamic camera, live verification) |
-| Core & Physics unit tests | ✅ 78 tests passing across 6 suites (Vector2, Clock, Camera2D, Registry, Projectile, Newton) |
-| Web build (Vite + TS) | ✅ Builds with relative paths (`./assets/...`) (46 KB bundle) |
-| Desktop browser development | ✅ Working with URL hash routing (`#projectile-motion`, `#newtons-second-law`) |
+| Simple Harmonic Motion simulation | ✅ Working (4 modes: Free Spring & Pendulum, Damped, Forced, Resonance A(Ω) curve) |
+| Core, Physics & Rendering unit tests | ✅ 160 tests passing across 9 suites (Vector2, Clock, Camera2D, Registry, Projectile, Newton, Curriculum, SHM, SHM Rendering) |
+| Web build (Vite + TS) | ✅ Builds with relative paths (`./assets/...`) (92.8 KB bundle) |
+| Desktop browser development | ✅ Working with URL hash routing (`#projectile-motion`, `#newtons-second-law`, `#simple-harmonic-motion`) |
 | Android shell (Kotlin/Compose) | ✅ Code complete (security hardened, dual D-pad/touch support, lifecycle managed) |
 | WebView integration | ✅ Code complete with `WebViewAssetLoader`, CORS headers, and MIME mappings |
-| Gradle wrapper | ✅ Verified with Gradle 9.6.1 + AGP 9.4.0 |
-| Gradle build configuration | ✅ Memory tuned for host (`-Xmx1024m -XX:+UseSerialGC`) |
+| Gradle build configuration | ✅ Memory tuned for host (`-Xmx1024m -XX:+UseSerialGC`, Gradle 9.6.1 + AGP 9.4.0) |
 | APK build | ✅ Working (`android/app/build/outputs/apk/debug/app-debug.apk`) |
-| Samsung Galaxy S21 FE testing | ✅ Verified on physical hardware (`[ANDROID-TEST-DEVICE]`, Android 14) |
-| Viewport & resolution testing | ✅ Verified at 2340×1080 native and 1920×1080 (16:9 TV baseline) |
-| Physical Android TV testing | ⏳ Pending: Awaiting physical TV hardware & remote testing |
-| Testing report | ✅ Documented in [docs/testing/first-vertical-slice.md](docs/testing/first-vertical-slice.md) |
+| Samsung Galaxy S21 FE testing | ✅ Verified on physical hardware (`[ANDROID-TEST-DEVICE]`, Android 16 / One UI 8.0) |
+| High-DPI Canvas scaling | ✅ Verified with DPR compensation (`ctx.scale(dpr, dpr)` & `ResizeObserver`) |
+| Physical Android TV testing | ⏳ Pending: Awaiting physical TV hardware & physical remote testing in classroom |
+| Testing reports | ✅ Documented in [docs/testing/first-vertical-slice.md](docs/testing/first-vertical-slice.md) and [docs/testing/shm-milestone-freeze.md](docs/testing/shm-milestone-freeze.md) |
 
 ## Prerequisites & D: Drive Setup
 
