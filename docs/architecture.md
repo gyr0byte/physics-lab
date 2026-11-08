@@ -79,18 +79,32 @@ Pure mathematical models, separated from rendering:
   - `computeForcesAndAcceleration(params, currentVelocity)` — normal, weight, static/kinetic friction, net force, acceleration
   - `stepNewtonsSecondLaw(currentState, params, dt)` — semi-implicit Euler step with zero-crossing friction arrest
   - `createInitialNewtonsSecondLawState(params)` — initial static state
+- `SimpleHarmonicPhysics.ts` — Numerical and analytical periodic motion models
+  - Free spring oscillation: vertical spring-mass equilibrium $Y_{\text{eq}} = -(L_0 + \Delta l + h_{\text{block}}/2)$, Hooke's law restoring force, acceleration $a = -(k/m)x$, velocity, and energy breakdown ($E_k, E_p, E_{\text{total}}$)
+  - Simple pendulum: angular motion $\theta(t) = \theta_0 \cos(\omega t)$ in the small-angle regime ($\theta \le 15^\circ$), natural frequency $\omega = \sqrt{g/L}$, bob coordinates, and tangential/radial vectors
+  - Damped oscillation: viscous damping with coefficient $b$, damping ratio $\gamma = b/(2m)$, and damped angular frequency $\omega_d = \sqrt{\omega_0^2 - \gamma^2}$, covering underdamped, critically damped, and overdamped regimes with energy dissipation
+  - Forced oscillation: external periodic driving force $F(t) = F_0 \cos(\Omega t)$, combined complementary and particular solutions, phase lag $\delta$, and transient-to-steady-state evolution
+  - Mechanical resonance: steady-state amplitude response $A(\Omega) = \frac{F_0/m}{\sqrt{(\omega_0^2 - \Omega^2)^2 + 4\gamma^2\Omega^2}}$, resonant peak frequency $\Omega_r = \sqrt{\omega_0^2 - 2\gamma^2}$, half-power bandwidth $\Delta \omega \approx 2\gamma$, and air-track horizontal apparatus travel-limit state preservation
 
 ### Rendering Layer
 
-Canvas drawing helpers:
+Canvas drawing modules and specialized apparatus renderers:
 
-- Grid and axes
-- Vector arrows (velocity, acceleration, applied force, friction, net force)
-- Trajectory paths
-- Circles (projectile)
-- Ground with hatching
-- Horizontal distance track with major/minor graduations
-- Sliding crate with mass label
+- `CanvasRenderer.ts` — Core 2D canvas drawing primitives:
+  - Grid and coordinate axes with unit graduations
+  - Vector arrows (velocity, acceleration, applied force, friction, net force)
+  - Trajectory paths and projectile circles
+  - Ground and ceiling surfaces with diagonal hatching
+  - Horizontal distance track with major/minor graduations
+  - Sliding crate with mass label
+- `SHMRenderer.ts` — Specialized periodic motion apparatus and analytical visualization:
+  - Coiled spring drawing with dynamic coil count, pitch, and end-brackets for vertical and horizontal configurations
+  - Suspended pendulum pivot, rod/string, and spherical bob with tangential and radial vector overlays
+  - Mass block on air-track guide rail with reference equilibrium indicators
+  - Live analytical energy bar displays ($E_k, E_p, E_{\text{total}}$) with conservation checks
+  - Real-time phase space $(x, v)$ trajectory and position-time $x(t)$ waveforms
+  - Analytical resonance curve $A(\Omega)$ with live driving frequency marker $\Omega$ and peak resonance indicators
+  - Physical travel-limit boundary lines and boundary-exceeded status alerts
 
 ### Simulation Registry & Dynamic URL Hash Routing
 
@@ -99,7 +113,7 @@ The web application supports multiple simulations through a decoupled registry p
 ```
 Android NavGraph / SimulationScreen.kt
               │
-              │  loadUrl("https://appassets.androidplatform.net/assets/simulation-web/index.html#newtons-second-law")
+              │  loadUrl("https://appassets.androidplatform.net/assets/simulation-web/index.html#simple-harmonic-motion")
               ▼
 WebView (Virtual HTTPS domain)
               │
@@ -111,10 +125,15 @@ main.ts (hashchange listener)
   3. Instantiate and initialize target simulation
 ```
 
+#### Implemented Simulations in Registry:
+1. `projectile-motion` (`ProjectileMotionSimulation.ts`) — Grade 11, Chapter 3: Kinematics
+2. `newtons-second-law` (`NewtonsSecondLawSimulation.ts`) — Grade 11, Chapter 4: Dynamics
+3. `simple-harmonic-motion` (`SimpleHarmonicMotionSimulation.ts`) — Grade 12, Chapter 2: Periodic Motion
+
 This ensures:
 - Adding new simulations requires zero modifications to navigation routing or WebView shell configuration.
 - Navigating between simulations inside WebView tears down previous animation frames, preventing memory leaks.
-- Desktop browser development directly supports bookmarkable/shareable URLs (e.g. `http://localhost:5173/#projectile-motion` vs `http://localhost:5173/#newtons-second-law`).
+- Desktop browser development directly supports bookmarkable/shareable URLs (e.g. `http://localhost:5173/#projectile-motion`, `http://localhost:5173/#newtons-second-law`, `http://localhost:5173/#simple-harmonic-motion`).
 
 ### Data Flow
 
