@@ -2,7 +2,7 @@
 # Copies the simulation-web build output into Android app assets.
 #
 # Usage: .\scripts\copy-web-assets.ps1
-# Run from the repository root (D:\Public High school)
+# Run from the repository root
 
 $ErrorActionPreference = "Stop"
 

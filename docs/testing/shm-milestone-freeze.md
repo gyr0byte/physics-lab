@@ -138,7 +138,17 @@ Tested on Samsung Galaxy S21 FE via ADB & Touch:
 
 ## 6. Build and Test Suite Summary
 
-- **Vitest Unit & Rendering Suite:** 160 / 160 passing (9 test suites)
+- **Vitest Unit & Rendering Suite:** **160 / 160 tests passing** across 9 test files:
+  - `tests/physics/shm.test.ts`: 57 passed
+  - `tests/physics/projectile.test.ts`: 35 passed
+  - `tests/rendering/shm-rendering.test.ts`: 15 passed
+  - `tests/physics/newton.test.ts`: 13 passed
+  - `tests/core/vector2.test.ts`: 12 passed
+  - `tests/curriculum/curriculum.test.ts`: 10 passed
+  - `tests/core/camera2d.test.ts`: 8 passed
+  - `tests/core/clock.test.ts`: 8 passed
+  - `tests/core/registry.test.ts`: 2 passed
+  *(Total: 57 + 35 + 15 + 13 + 12 + 10 + 8 + 8 + 2 = 160 tests)*
 - **TypeScript Typecheck:** Clean (`tsc --noEmit`, 0 errors)
 - **Vite Production Bundle:** `dist/assets/index-DrV5jlBc.js` (92.81 kB, gzip 22.75 kB)
 - **Android Gradle Build:** `.\gradlew.bat assembleDebug` SUCCESS in 24s (`app-debug.apk`)

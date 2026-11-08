@@ -1,6 +1,9 @@
 # Physics Lab
 
-Interactive physics simulations for Grade 11 and Grade 12 students, following the Nepal secondary-level Physics curriculum. Designed for Android TV in a classroom setting at Shree Public High School, Dharan-12, Sunsari, Nepal.
+Interactive physics simulations for Grade 11 and Grade 12 students, following the Nepal secondary-level Physics curriculum. Designed for Android TV in a classroom setting.
+
+> [!NOTE]
+> Physics Lab is an independent educational software project developed with classroom use in mind. It is not an official product or endorsement of the Curriculum Development Centre, Ministry of Education, or Shree Public High School.
 
 ## Product Vision & Scope
 
@@ -49,9 +52,7 @@ Official Nepal CDC curriculum specifications (`docs/curriculum/`) serve strictly
 | Physical Android TV testing | ⏳ Pending: Awaiting physical TV hardware & physical remote testing in classroom |
 | Testing reports | ✅ Documented in [docs/testing/first-vertical-slice.md](docs/testing/first-vertical-slice.md) and [docs/testing/shm-milestone-freeze.md](docs/testing/shm-milestone-freeze.md) |
 
-## Prerequisites & D: Drive Setup
-
-To protect limited C: drive disk space, all large SDKs, build caches, and tools are configured for the **D:** drive.
+## Prerequisites & Environment Setup
 
 ### For simulation development (web only)
 
@@ -60,26 +61,24 @@ To protect limited C: drive disk space, all large SDKs, build caches, and tools 
 
 ### For Android APK builds
 
-| Requirement | Target Location | Notes |
-|------------|-----------------|-------|
-| JDK 17 | `D:\jdk-17` | Set `JAVA_HOME=D:\jdk-17` (do not use JDK 25 for Android build) |
-| Android SDK | `D:\Android\Sdk` | Set `ANDROID_HOME=D:\Android\Sdk` |
-| Gradle user home / cache | `D:\Gradle` | Set `GRADLE_USER_HOME=D:\Gradle` (keeps caches off C:) |
-| SDK Platform | API 37 | Install via SDK Manager (`platforms;android-37`) |
-| Build Tools | 36.0.0 | Install via SDK Manager (`build-tools;36.0.0`) |
+| Requirement | Notes |
+|------------|-------|
+| JDK 17+ | Standard JDK 17, 21, or 25. Set `JAVA_HOME` in your environment. |
+| Android SDK | Platform API 37 (`platforms;android-37`). Set `ANDROID_HOME` or `ANDROID_SDK_ROOT`. |
+| Build Tools | 36.0.0 (`build-tools;36.0.0`). |
+| Gradle user home / cache | Optional: Set `GRADLE_USER_HOME` to control cache directory location. |
 
 **Environment setup (PowerShell):**
 
 ```powershell
-$env:JAVA_HOME = "D:\jdk-17"
-$env:ANDROID_HOME = "D:\Android\Sdk"
-$env:GRADLE_USER_HOME = "D:\Gradle"
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-17"  # Adjust to your JDK installation path
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"  # Adjust to your SDK path
 ```
 
 **Machine-specific `local.properties`:**
-Do not commit `local.properties` (it is gitignored). You can copy `android/local.properties.example` to `android/local.properties`:
+Do not commit `local.properties` (it is gitignored). You can copy `android/local.properties.example` to `android/local.properties` and configure your local SDK path:
 ```properties
-sdk.dir=D\:\\Android\\Sdk
+sdk.dir=C\:\\Users\\<YourUser>\\AppData\\Local\\Android\\Sdk
 ```
 
 ## Quick Start
@@ -251,4 +250,4 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 
 ## License
 
-This project is educational software for a college in Nepal. License TBD.
+This project is licensed under the [MIT License](LICENSE).

@@ -2,13 +2,13 @@
 # Full build pipeline: web -> copy assets -> Android APK
 #
 # Usage: .\scripts\build-all.ps1
-# Run from the repository root (D:\Public High school)
+# Run from the repository root
 #
 # Prerequisites:
 #   - Node.js and npm installed
-#   - JAVA_HOME set to JDK 17 (e.g., D:\jdk-17)
-#   - ANDROID_HOME set to Android SDK (e.g., D:\Android\Sdk)
-#   - GRADLE_USER_HOME set to Gradle cache location (e.g., D:\Gradle)
+#   - JAVA_HOME set to JDK 17+
+#   - ANDROID_HOME set to Android SDK
+#   - GRADLE_USER_HOME optionally set to Gradle cache directory
 
 $ErrorActionPreference = "Stop"
 
@@ -51,18 +51,18 @@ Write-Host ""
 Write-Host "Step 4: Building Android APK..." -ForegroundColor Yellow
 $androidDir = Join-Path $repoRoot "android"
 
-# Default GRADLE_USER_HOME to D:\Gradle to protect C: drive
-if (-not $env:GRADLE_USER_HOME) {
+# Check GRADLE_USER_HOME; if D:\Gradle exists on this host and unset, reuse it
+if (-not $env:GRADLE_USER_HOME -and (Test-Path "D:\Gradle")) {
     $env:GRADLE_USER_HOME = "D:\Gradle"
-    Write-Host "  Using default GRADLE_USER_HOME: D:\Gradle" -ForegroundColor Gray
+    Write-Host "  Using existing local cache: D:\Gradle" -ForegroundColor Gray
 }
 
 # Check prerequisites
 if (-not $env:JAVA_HOME) {
-    Write-Warning 'JAVA_HOME not set. Set it to JDK 17 (e.g., D:\jdk-17)'
+    Write-Warning 'JAVA_HOME not set. Set it to your JDK 17+ installation directory.'
 }
 if (-not $env:ANDROID_HOME -and -not $env:ANDROID_SDK_ROOT) {
-    Write-Warning 'ANDROID_HOME not set. Set it to Android SDK (e.g., D:\Android\Sdk)'
+    Write-Warning 'ANDROID_HOME not set. Set it to your Android SDK directory.'
 }
 
 Push-Location $androidDir
