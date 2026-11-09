@@ -119,6 +119,8 @@ export interface WorkEnergyForceBreakdown {
   gravityParallel: number;
   /** Normal reaction force perpendicular to incline in Newtons: N = m * g * cos(θ) */
   normalReaction: number;
+  /** Alias for normalReaction */
+  normalForce: number;
   /** Spring restoring force on block in Newtons: F_s = -k * x_s (negative = uphill) */
   springForce: number;
   /** Friction force on block in Newtons (opposes velocity or balances driving force) */
@@ -356,9 +358,18 @@ export function computeSpringForce(compression: number, springConstant: number):
  */
 export function computeWorkEnergyForces(
   params: WorkEnergyParams,
-  displacement: number,
-  velocity: number
+  displacementOrState: number | WorkEnergyState,
+  velocity?: number
 ): WorkEnergyForceBreakdown {
+  const displacement =
+    typeof displacementOrState === 'number'
+      ? displacementOrState
+      : displacementOrState.displacement;
+  const vel =
+    typeof displacementOrState === 'number'
+      ? (velocity ?? 0)
+      : displacementOrState.velocity;
+
   const g = params.gravity ?? WORK_ENERGY_CONSTANTS.DEFAULT_GRAVITY;
   const m = params.mass;
   const thetaRad = (params.inclineAngleDeg * Math.PI) / 180;
@@ -378,7 +389,7 @@ export function computeWorkEnergyForces(
   // Driving force along the incline (gravity + spring)
   const drivingForce = gravityParallel + springForce;
 
-  const isAtRest = Math.abs(velocity) < WORK_ENERGY_CONSTANTS.REST_VELOCITY_EPSILON;
+  const isAtRest = Math.abs(vel) < WORK_ENERGY_CONSTANTS.REST_VELOCITY_EPSILON;
 
   let frictionForce = 0;
   let isStatic = false;
@@ -396,7 +407,7 @@ export function computeWorkEnergyForces(
     }
   } else {
     // Sliding: kinetic friction opposes velocity
-    const sign = velocity > 0 ? 1 : -1;
+    const sign = vel > 0 ? 1 : -1;
     frictionForce = kineticFrictionMag === 0 ? 0 : -sign * kineticFrictionMag;
     isStatic = false;
   }
@@ -407,6 +418,7 @@ export function computeWorkEnergyForces(
   return {
     gravityParallel,
     normalReaction,
+    normalForce: normalReaction,
     springForce,
     frictionForce,
     netForce,

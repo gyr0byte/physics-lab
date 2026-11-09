@@ -541,6 +541,15 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
       expect(nextState.displacement).toBeGreaterThan(0);
       expect(nextState.velocity).toBeGreaterThan(0);
     });
+
+    it('calculates the exact theoretical initial acceleration for default parameters a0 = 3.69757 m/s²', () => {
+      const initialState = createInitialWorkEnergyState(DEFAULT_WORK_ENERGY_PARAMS);
+      // a0 = g * (sin(25°) - 0.05 * cos(25°)) = 9.8 * (0.42261826 - 0.04531539) = 3.697568 m/s²
+      const expectedA0 = 9.8 * (Math.sin((25.0 * Math.PI) / 180) - 0.05 * Math.cos((25.0 * Math.PI) / 180));
+      expect(expectedA0).toBeCloseTo(3.697568, 5);
+      expect(initialState.acceleration).toBeCloseTo(3.697568, 5);
+      expect(initialState.acceleration).toBeCloseTo(3.69757, 4);
+    });
   });
 
   // --------------------------------------------------------------------------
