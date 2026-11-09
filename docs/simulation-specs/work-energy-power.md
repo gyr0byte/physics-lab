@@ -130,6 +130,12 @@ Along the track:
 5. **Total Energy Ledger:**
    $$E_{\text{total}}(t) = K(t) + U_g(t) + U_s(t) + Q(t) = E_0 = mg s_{\max} \sin\theta$$
 
+   For the default parameter set ($m = 2.0\text{ kg}, \theta = 25.0^\circ, g = 9.8\text{ m/s}^2, s_{\max} = 4.90\text{ m}$):
+   $$E_0 = (2.0)(9.8)(4.90)\sin(25^\circ) = 96.04 \times 0.42261826\dots = 40.5883\text{ J}$$
+
+   For an alternative configuration at $\theta = 20.0^\circ$:
+   $$E_0 = (2.0)(9.8)(4.90)\sin(20^\circ) = 96.04 \times 0.34202014\dots = 32.8476\text{ J}$$
+
 ### 5.2 Work Calculations & Work-Energy Theorem
 1. **Work done by gravity:**
    $$W_g = \int_0^s mg\sin\theta\, ds' = mg\sin\theta \cdot s = -\Delta U_g$$
@@ -175,3 +181,4 @@ Along the track:
 - **Uniform Incline:** Friction coefficients $\mu_s, \mu_k$ and incline angle $\theta$ are homogeneous across the entire track.
 - **Ideal Linear Spring:** Massless spring obeying Hooke's law up to solid height $L_{\text{solid}} = 0.10\text{ m}$.
 - **Zero Inelastic Impact Fabrication:** The model terminates upon solid height contact rather than fabricating a restitution coefficient.
+

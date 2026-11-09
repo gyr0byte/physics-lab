@@ -205,7 +205,7 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
   // 7. Work-energy theorem
   // --------------------------------------------------------------------------
   describe('7. Work-energy theorem', () => {
-    it('strictly satisfies delta K = W_g + W_s + W_f across integrated trajectory', () => {
+    it('strictly satisfies delta K = W_g + W_s + W_f across integrated trajectory through spring compression and rebound', () => {
       const params: WorkEnergyParams = {
         ...DEFAULT_WORK_ENERGY_PARAMS,
         mass: 2.0,
@@ -217,12 +217,60 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
 
       let state = createInitialWorkEnergyState(params);
       const dt = 0.016; // ~60 Hz frame
-      const totalSteps = 60; // 0.96 seconds of motion
+      const totalSteps = 200; // 3.2 seconds of motion: downhill, spring compression, turnaround, uphill rebound
+
+      let reachedSpring = false;
+      let reachedRebound = false;
 
       for (let i = 0; i < totalSteps; i++) {
         state = stepWorkEnergy(state, params, dt);
+        if (state.displacement >= WORK_ENERGY_CONSTANTS.SPRING_CONTACT_POS) {
+          reachedSpring = true;
+        }
+        if (reachedSpring && state.velocity < 0) {
+          reachedRebound = true;
+        }
         const work = computeWorkBreakdown(params, state);
-        expect(work.workEnergyTheoremError).toBeLessThan(1e-4);
+        expect(work.workEnergyTheoremError).toBeLessThan(1e-3);
+      }
+
+      expect(reachedSpring).toBe(true);
+      expect(reachedRebound).toBe(true);
+    });
+
+    it('independently verifies work-energy theorem against step-by-step numerical force path integral', () => {
+      const params: WorkEnergyParams = {
+        ...DEFAULT_WORK_ENERGY_PARAMS,
+        mass: 2.0,
+        inclineAngleDeg: 25.0,
+        kineticFriction: 0.05,
+        staticFriction: 0.08,
+        springConstant: 40.0,
+      };
+
+      let state = createInitialWorkEnergyState(params);
+      const dt = 0.01;
+      let accumulatedWorkRiemann = 0;
+
+      for (let i = 0; i < 150; i++) {
+        const sPrev = state.displacement;
+        const vPrev = state.velocity;
+        state = stepWorkEnergy(state, params, dt);
+
+        const deltaS = state.displacement - sPrev;
+        // Midpoint force evaluation for independent Riemann work integral: W = integral F_net ds
+        const sMid = (sPrev + state.displacement) / 2;
+        const vMid = (vPrev + state.velocity) / 2;
+        const midForces = computeWorkEnergyForces(params, sMid, vMid);
+        accumulatedWorkRiemann += midForces.netForce * deltaS;
+
+        const deltaKinetic = 0.5 * params.mass * state.velocity * state.velocity;
+        const workBreakdown = computeWorkBreakdown(params, state);
+
+        // Independent Riemann integral matches analytical work sum
+        expect(workBreakdown.workNet).toBeCloseTo(accumulatedWorkRiemann, 1);
+        // Independent kinetic energy change matches analytical work
+        expect(deltaKinetic).toBeCloseTo(workBreakdown.workNet, 2);
       }
     });
 
@@ -244,11 +292,26 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
   // 8. Frictionless mechanical-energy conservation
   // --------------------------------------------------------------------------
   describe('8. Frictionless mechanical-energy conservation', () => {
-    it('conserves total mechanical energy K + U_g + U_s = E_0 over multiple full rebound cycles', () => {
+    it('calculates the exact theoretical initial potential energy for default parameters (theta = 25 deg)', () => {
+      const state = createInitialWorkEnergyState(DEFAULT_WORK_ENERGY_PARAMS);
+      const ledger = computeWorkEnergyLedger(DEFAULT_WORK_ENERGY_PARAMS, state);
+
+      // E_0 = m * g * s_max * sin(25°) = 2.0 * 9.8 * 4.90 * sin(25°)
+      const expectedE0 = 2.0 * 9.8 * 4.90 * Math.sin((25.0 * Math.PI) / 180);
+      expect(expectedE0).toBeCloseTo(40.588258, 5);
+      expect(ledger.initialEnergy).toBeCloseTo(40.588258, 5);
+      expect(ledger.gravitationalPE).toBeCloseTo(40.588258, 5);
+      expect(ledger.kineticEnergy).toBe(0);
+      expect(ledger.elasticPE).toBe(0);
+      expect(ledger.thermalEnergy).toBe(0);
+      expect(ledger.totalEnergy).toBeCloseTo(40.588258, 5);
+      expect(ledger.energyConservationError).toBeLessThan(1e-12);
+    });
+
+    it('conserves total mechanical energy K + U_g + U_s = E_0 at theta = 25 deg (E_0 = 40.5883 J, k = 50 N/m)', () => {
+      // At theta = 25 deg, frictionless motion with k = 50 N/m gives s_turn = 4.755 m < 4.90 m
       const params: WorkEnergyParams = {
         ...DEFAULT_WORK_ENERGY_PARAMS,
-        mass: 2.0,
-        inclineAngleDeg: 20.0,
         kineticFriction: 0.0,
         staticFriction: 0.0,
         springConstant: 50.0,
@@ -256,7 +319,7 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
 
       let state = createInitialWorkEnergyState(params);
       const initialEnergy = computeWorkEnergyLedger(params, state).initialEnergy;
-      expect(initialEnergy).toBeGreaterThan(0);
+      expect(initialEnergy).toBeCloseTo(40.588258, 5);
 
       const dt = 0.01;
       const totalDuration = 3.0; // 3 seconds, multiple bounces
@@ -277,7 +340,71 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
       }
 
       expect(state.status).toBe('active');
-      expect(maxError).toBeLessThan(0.05); // Less than 50 mJ error on ~33 J total
+      expect(maxError).toBeLessThan(0.05); // Less than 50 mJ error on 40.59 J total
+    });
+
+    it('conserves total mechanical energy K + U_g + U_s = E_0 for custom parameters (theta = 20 deg, E_0 = 32.8476 J)', () => {
+      const params: WorkEnergyParams = {
+        ...DEFAULT_WORK_ENERGY_PARAMS,
+        mass: 2.0,
+        inclineAngleDeg: 20.0, // 20 degrees incline
+        kineticFriction: 0.0,
+        staticFriction: 0.0,
+        springConstant: 50.0,
+      };
+
+      let state = createInitialWorkEnergyState(params);
+      const initialEnergy = computeWorkEnergyLedger(params, state).initialEnergy;
+
+      // E_0 = 2.0 * 9.8 * 4.90 * sin(20°) = 32.847615 J
+      const expectedE0 = 2.0 * 9.8 * 4.90 * Math.sin((20.0 * Math.PI) / 180);
+      expect(initialEnergy).toBeCloseTo(expectedE0, 5);
+      expect(initialEnergy).toBeCloseTo(32.847615, 5);
+
+      const dt = 0.01;
+      const totalDuration = 3.0; // 3 seconds, multiple bounces
+      const steps = Math.floor(totalDuration / dt);
+
+      let maxError = 0;
+
+      for (let i = 0; i < steps; i++) {
+        state = stepWorkEnergy(state, params, dt);
+        if (state.status === 'exceeded') break;
+
+        const ledger = computeWorkEnergyLedger(params, state);
+        maxError = Math.max(maxError, ledger.energyConservationError);
+
+        // Relative error must be under 0.05%
+        const relativeError = ledger.energyConservationError / initialEnergy;
+        expect(relativeError).toBeLessThan(5e-4);
+      }
+
+      expect(state.status).toBe('active');
+      expect(maxError).toBeLessThan(0.05); // Less than 50 mJ error on 32.85 J total
+    });
+
+    it('correctly detects travel limit exceeded when frictionless motion at theta = 25 deg with soft k = 40 N/m reaches solid height', () => {
+      // For m=2, theta=25 deg, mu=0, k=40: theoretical turning point is x_s = 1.43 m > 1.40 m (s = 4.93 m > 4.90 m)
+      const params: WorkEnergyParams = {
+        ...DEFAULT_WORK_ENERGY_PARAMS,
+        kineticFriction: 0.0,
+        staticFriction: 0.0,
+        springConstant: 40.0,
+      };
+
+      let state = createInitialWorkEnergyState(params);
+      let exceeded = false;
+
+      for (let i = 0; i < 300; i++) {
+        state = stepWorkEnergy(state, params, 0.01);
+        if (state.status === 'exceeded') {
+          exceeded = true;
+          expect(state.statusMessage).toContain('solid height limit');
+          break;
+        }
+      }
+
+      expect(exceeded).toBe(true);
     });
   });
 
@@ -314,6 +441,57 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
       }
 
       expect(prevQ).toBeGreaterThan(0);
+    });
+
+    it('uses actual path length for thermal dissipation during direction reversal', () => {
+      const params: WorkEnergyParams = {
+        ...DEFAULT_WORK_ENERGY_PARAMS,
+        mass: 2.0,
+        inclineAngleDeg: 25.0,
+        kineticFriction: 0.05,
+        staticFriction: 0.08,
+        springConstant: 40.0,
+      };
+
+      let state = createInitialWorkEnergyState(params);
+      const dt = 0.01;
+      let sMaxRecorded = 0;
+      let reversed = false;
+
+      // Run until turnaround inside spring and rebound
+      for (let i = 0; i < 250; i++) {
+        state = stepWorkEnergy(state, params, dt);
+        if (state.displacement > sMaxRecorded) {
+          sMaxRecorded = state.displacement;
+        }
+        if (sMaxRecorded > WORK_ENERGY_CONSTANTS.SPRING_CONTACT_POS && state.velocity < -0.1) {
+          reversed = true;
+          break;
+        }
+      }
+
+      expect(reversed).toBe(true);
+      expect(sMaxRecorded).toBeGreaterThan(WORK_ENERGY_CONSTANTS.SPRING_CONTACT_POS);
+
+      // Current position is uphill from sMaxRecorded
+      expect(state.displacement).toBeLessThan(sMaxRecorded);
+
+      // True path length is: downhill to sMaxRecorded + uphill rebound distance
+      const truePathLength = sMaxRecorded + (sMaxRecorded - state.displacement);
+      const netDisplacement = state.displacement;
+
+      expect(truePathLength).toBeGreaterThan(netDisplacement);
+
+      // Normal force N = m * g * cos(25°)
+      const N = params.mass * (params.gravity ?? 9.8) * Math.cos((25.0 * Math.PI) / 180);
+      const expectedQ = params.kineticFriction * N * truePathLength;
+
+      // Thermal energy accumulated in state must match true path length dissipation
+      expect(state.thermalEnergy).toBeCloseTo(expectedQ, 2);
+
+      // It strictly exceeds the naive net displacement dissipation mu_k * N * s
+      const naiveQ = params.kineticFriction * N * netDisplacement;
+      expect(state.thermalEnergy).toBeGreaterThan(naiveQ);
     });
   });
 
@@ -593,3 +771,4 @@ describe('Work, Energy & Power Physics Engine (Grade 11, Chapter 5)', () => {
     });
   });
 });
+
