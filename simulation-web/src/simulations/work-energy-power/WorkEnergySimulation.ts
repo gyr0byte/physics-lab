@@ -13,6 +13,7 @@ import {
   computeWorkEnergyLedger,
   computeWorkBreakdown,
   computeWorkEnergyPower,
+  sampleForceDisplacementCurve,
 } from '../../physics/WorkEnergyPhysics';
 import { renderWorkEnergyApparatus } from '../../rendering/WorkEnergyRenderer';
 import { Graph } from '../../components/Graph';
@@ -75,7 +76,7 @@ const PARAMETERS: ParameterDef[] = [
   },
 ];
 
-type GraphTab = 'energy' | 'power' | 'kinematics';
+type GraphTab = 'energy' | 'power' | 'kinematics' | 'force';
 
 export class WorkEnergySimulation implements Simulation {
   readonly metadata: SimulationMetadata = {
@@ -104,21 +105,29 @@ export class WorkEnergySimulation implements Simulation {
   private _energyGraph: Graph | null = null;
   private _powerGraph: Graph | null = null;
   private _kinematicsGraph: Graph | null = null;
+  private _forceGraph: Graph | null = null;
   private _graphContainers: Record<GraphTab, HTMLElement | null> = {
     energy: null,
     power: null,
     kinematics: null,
+    force: null,
   };
 
   // Series indices
   private _seriesK = -1;
   private _seriesUg = -1;
   private _seriesUs = -1;
+  private _seriesQ = -1;
   private _seriesEtot = -1;
-  private _seriesPinst = -1;
-  private _seriesPavg = -1;
+  private _seriesPg = -1;
+  private _seriesPs = -1;
+  private _seriesPf = -1;
+  private _seriesPnet = -1;
   private _seriesV = -1;
   private _seriesA = -1;
+  private _seriesFg = -1;
+  private _seriesFs = -1;
+  private _seriesFcons = -1;
 
   private _running = false;
   private _focusedControl = 0;
@@ -273,6 +282,7 @@ export class WorkEnergySimulation implements Simulation {
       this._params.springConstant = 50;
       this._updateParamDisplays();
       this._resetPhysics();
+      this._updateForceGraph();
     });
     presetCol.appendChild(btnFrictionless);
 
@@ -290,6 +300,7 @@ export class WorkEnergySimulation implements Simulation {
       this._params.springConstant = 40;
       this._updateParamDisplays();
       this._resetPhysics();
+      this._updateForceGraph();
     });
     presetCol.appendChild(btnHighFriction);
 
@@ -305,6 +316,7 @@ export class WorkEnergySimulation implements Simulation {
       this._params.springConstant = 80;
       this._updateParamDisplays();
       this._resetPhysics();
+      this._updateForceGraph();
     });
     presetCol.appendChild(btnStiffSpring);
 
@@ -393,22 +405,26 @@ export class WorkEnergySimulation implements Simulation {
       { id: 'energy', label: 'Energy' },
       { id: 'power', label: 'Power' },
       { id: 'kinematics', label: 'Kin' },
+      { id: 'force', label: 'Force' },
     ];
 
     tabs.forEach((tab) => {
       const tabBtn = document.createElement('button');
       tabBtn.id = `graph-tab-${tab.id}`;
       tabBtn.textContent = tab.label;
+      tabBtn.tabIndex = 0;
       tabBtn.style.cssText = `
-        padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+        padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
         cursor: pointer; border: 1px solid ${tab.id === this._activeTab ? '#38BDF8' : 'rgba(255,255,255,0.1)'};
         background: ${tab.id === this._activeTab ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)'};
         color: ${tab.id === this._activeTab ? '#38BDF8' : '#94A3B8'};
+        -webkit-tap-highlight-color: transparent;
       `;
       tabBtn.addEventListener('click', () => {
         this._setGraphTab(tab.id);
       });
       tabRow.appendChild(tabBtn);
+      this._controlElements.push(tabBtn);
     });
 
     graphHeader.appendChild(tabRow);
@@ -418,44 +434,75 @@ export class WorkEnergySimulation implements Simulation {
     const graphsWrapper = document.createElement('div');
     graphsWrapper.style.cssText = 'width: 100%; display: flex; justify-content: center; position: relative;';
 
-    // 1. Energy Graph
+    // 1. Energy Graph (K, Ug, Us, Q, Etot)
     const energyContainer = document.createElement('div');
     energyContainer.style.cssText = 'width: 100%; display: block;';
     this._energyGraph = new Graph(energyContainer, 302, 130, 'Time (s)', 'Energy (J)');
-    this._seriesK = this._energyGraph.addSeries('K (J)', '#38BDF8');
-    this._seriesUg = this._energyGraph.addSeries('Ug (J)', '#10B981');
-    this._seriesUs = this._energyGraph.addSeries('Us (J)', '#F59E0B');
-    this._seriesEtot = this._energyGraph.addSeries('E_tot (J)', '#E2E8F0');
+    this._seriesK = this._energyGraph.addSeries('K', '#38BDF8');
+    this._seriesUg = this._energyGraph.addSeries('Ug', '#10B981');
+    this._seriesUs = this._energyGraph.addSeries('Us', '#F59E0B');
+    this._seriesQ = this._energyGraph.addSeries('Q', '#F43F5E');
+    this._seriesEtot = this._energyGraph.addSeries('Etot', '#E2E8F0');
     graphsWrapper.appendChild(energyContainer);
     this._graphContainers.energy = energyContainer;
 
-    // 2. Power Graph
+    // 2. Power Graph (Pg, Ps, Pf, Pnet)
     const powerContainer = document.createElement('div');
     powerContainer.style.cssText = 'width: 100%; display: none;';
     this._powerGraph = new Graph(powerContainer, 302, 130, 'Time (s)', 'Power (W)');
-    this._seriesPinst = this._powerGraph.addSeries('P_inst (W)', '#EC4899');
-    this._seriesPavg = this._powerGraph.addSeries('P_avg (W)', '#A855F7');
+    this._seriesPg = this._powerGraph.addSeries('Pg', '#10B981');
+    this._seriesPs = this._powerGraph.addSeries('Ps', '#F59E0B');
+    this._seriesPf = this._powerGraph.addSeries('Pf', '#F43F5E');
+    this._seriesPnet = this._powerGraph.addSeries('Pnet', '#38BDF8');
     graphsWrapper.appendChild(powerContainer);
     this._graphContainers.power = powerContainer;
 
-    // 3. Kinematics Graph
+    // 3. Kinematics Graph (v, a)
     const kinematicsContainer = document.createElement('div');
     kinematicsContainer.style.cssText = 'width: 100%; display: none;';
     this._kinematicsGraph = new Graph(kinematicsContainer, 302, 130, 'Time (s)', 'Kinematics');
-    this._seriesV = this._kinematicsGraph.addSeries('v (m/s)', '#38BDF8');
-    this._seriesA = this._kinematicsGraph.addSeries('a (m/s²)', '#34D399');
+    this._seriesV = this._kinematicsGraph.addSeries('v', '#38BDF8');
+    this._seriesA = this._kinematicsGraph.addSeries('a', '#34D399');
     graphsWrapper.appendChild(kinematicsContainer);
     this._graphContainers.kinematics = kinematicsContainer;
+
+    // 4. Force vs Displacement Graph (Fg, Fs, Fg+Fs)
+    const forceContainer = document.createElement('div');
+    forceContainer.style.cssText = 'width: 100%; display: none;';
+    this._forceGraph = new Graph(forceContainer, 302, 130, 'Displacement s (m)', 'Force (N)');
+    this._seriesFg = this._forceGraph.addSeries('Fg', '#10B981');
+    this._seriesFs = this._forceGraph.addSeries('Fs', '#F59E0B');
+    this._seriesFcons = this._forceGraph.addSeries('Fg+Fs', '#38BDF8');
+    graphsWrapper.appendChild(forceContainer);
+    this._graphContainers.force = forceContainer;
+
+    this._updateForceGraph();
 
     panel.appendChild(graphsWrapper);
 
     return panel;
   }
 
+  private _updateForceGraph(): void {
+    if (!this._forceGraph) return;
+    this._forceGraph.clear();
+    const samples = sampleForceDisplacementCurve(
+      this._params,
+      0,
+      WORK_ENERGY_CONSTANTS.LOWER_TRAVEL_LIMIT,
+      50
+    );
+    for (const s of samples) {
+      this._forceGraph.pushData(this._seriesFg, s.displacement, s.gravityForce);
+      this._forceGraph.pushData(this._seriesFs, s.displacement, s.springForce);
+      this._forceGraph.pushData(this._seriesFcons, s.displacement, s.conservativeDrivingForce);
+    }
+  }
+
   private _setGraphTab(tab: GraphTab): void {
     this._activeTab = tab;
     // Update tab button styles
-    (['energy', 'power', 'kinematics'] as GraphTab[]).forEach((t) => {
+    (['energy', 'power', 'kinematics', 'force'] as GraphTab[]).forEach((t) => {
       const btn = document.getElementById(`graph-tab-${t}`);
       const container = this._graphContainers[t];
       if (btn) {
@@ -467,6 +514,11 @@ export class WorkEnergySimulation implements Simulation {
         container.style.display = t === tab ? 'block' : 'none';
       }
     });
+
+    if (tab === 'force') {
+      this._updateForceGraph();
+      if (this._forceGraph) this._forceGraph.render();
+    }
   }
 
   private _createParamControl(param: ParameterDef, index: number): HTMLElement {
@@ -566,6 +618,7 @@ export class WorkEnergySimulation implements Simulation {
 
     this._updateParamDisplays();
     this._resetPhysics();
+    this._updateForceGraph();
   }
 
   private _updateParamDisplays(): void {
@@ -581,14 +634,21 @@ export class WorkEnergySimulation implements Simulation {
 
   private _updateFocus(): void {
     this._controlElements.forEach((el, index) => {
+      const isTab = el.id && el.id.startsWith('graph-tab-');
       if (index === this._focusedControl) {
-        el.style.borderColor = '#0284c7';
-        el.style.backgroundColor = 'rgba(2, 132, 199, 0.15)';
+        el.style.borderColor = '#38BDF8';
+        el.style.backgroundColor = isTab ? 'rgba(56, 189, 248, 0.35)' : 'rgba(2, 132, 199, 0.2)';
         el.focus();
       } else {
-        el.style.borderColor = 'transparent';
-        el.style.backgroundColor =
-          index < PARAMETERS.length ? 'rgba(255,255,255,0.04)' : '';
+        if (isTab) {
+          const tabId = el.id.replace('graph-tab-', '') as GraphTab;
+          el.style.borderColor = tabId === this._activeTab ? '#38BDF8' : 'rgba(255,255,255,0.1)';
+          el.style.backgroundColor = tabId === this._activeTab ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)';
+        } else {
+          el.style.borderColor = 'transparent';
+          el.style.backgroundColor =
+            index < PARAMETERS.length ? 'rgba(255,255,255,0.04)' : '';
+        }
       }
     });
   }
@@ -627,6 +687,7 @@ export class WorkEnergySimulation implements Simulation {
           this._params.springConstant = 50;
           this._updateParamDisplays();
           this._resetPhysics();
+          this._updateForceGraph();
         } else if (this._focusedControl === PARAMETERS.length + 3) {
           // Preset 2: High friction
           this._params.kineticFriction = 0.15;
@@ -634,11 +695,21 @@ export class WorkEnergySimulation implements Simulation {
           this._params.springConstant = 40;
           this._updateParamDisplays();
           this._resetPhysics();
+          this._updateForceGraph();
         } else if (this._focusedControl === PARAMETERS.length + 4) {
           // Preset 3: Stiff spring
           this._params.springConstant = 80;
           this._updateParamDisplays();
           this._resetPhysics();
+          this._updateForceGraph();
+        } else if (this._focusedControl === PARAMETERS.length + 5) {
+          this._setGraphTab('energy');
+        } else if (this._focusedControl === PARAMETERS.length + 6) {
+          this._setGraphTab('power');
+        } else if (this._focusedControl === PARAMETERS.length + 7) {
+          this._setGraphTab('kinematics');
+        } else if (this._focusedControl === PARAMETERS.length + 8) {
+          this._setGraphTab('force');
         }
         break;
       case 'space':
@@ -706,6 +777,7 @@ export class WorkEnergySimulation implements Simulation {
     if (this._energyGraph) this._energyGraph.clear();
     if (this._powerGraph) this._powerGraph.clear();
     if (this._kinematicsGraph) this._kinematicsGraph.clear();
+    this._updateForceGraph();
 
     const startBtn = document.getElementById('work-energy-start-btn');
     if (startBtn) {
@@ -723,6 +795,7 @@ export class WorkEnergySimulation implements Simulation {
     if (!this._running) {
       this._currentState = createInitialWorkEnergyState(this._params);
       this._updateMeasurementPanel();
+      this._updateForceGraph();
     }
   }
 
@@ -744,12 +817,15 @@ export class WorkEnergySimulation implements Simulation {
             this._energyGraph.pushData(this._seriesK, t, ledger.kineticEnergy);
             this._energyGraph.pushData(this._seriesUg, t, ledger.gravitationalPE);
             this._energyGraph.pushData(this._seriesUs, t, ledger.elasticPE);
+            this._energyGraph.pushData(this._seriesQ, t, ledger.thermalEnergy);
             this._energyGraph.pushData(this._seriesEtot, t, ledger.totalEnergy);
           }
           if (this._powerGraph) {
             const power = computeWorkEnergyPower(this._params, this._currentState);
-            this._powerGraph.pushData(this._seriesPinst, t, power.powerNet);
-            this._powerGraph.pushData(this._seriesPavg, t, power.avgPowerNet);
+            this._powerGraph.pushData(this._seriesPg, t, power.powerGravity);
+            this._powerGraph.pushData(this._seriesPs, t, power.powerSpring);
+            this._powerGraph.pushData(this._seriesPf, t, power.powerFriction);
+            this._powerGraph.pushData(this._seriesPnet, t, power.powerNet);
           }
           if (this._kinematicsGraph) {
             this._kinematicsGraph.pushData(this._seriesV, t, this._currentState.velocity);
@@ -797,6 +873,8 @@ export class WorkEnergySimulation implements Simulation {
       this._powerGraph.render();
     } else if (this._activeTab === 'kinematics' && this._kinematicsGraph) {
       this._kinematicsGraph.render();
+    } else if (this._activeTab === 'force' && this._forceGraph) {
+      this._forceGraph.render();
     }
   }
 
@@ -922,6 +1000,10 @@ export class WorkEnergySimulation implements Simulation {
     if (this._kinematicsGraph) {
       this._kinematicsGraph.dispose();
       this._kinematicsGraph = null;
+    }
+    if (this._forceGraph) {
+      this._forceGraph.dispose();
+      this._forceGraph = null;
     }
 
     if (this._container) {

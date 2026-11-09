@@ -146,14 +146,14 @@ export function computeInclineTransform(
     originWorld.y + springTopS * uDownhill.y
   );
 
-  // Track extents
+  // Guide rail extends from s = -0.80 m to s = 5.20 m
   const trackStartWorld = new Vector2(
     originWorld.x - 0.80 * uDownhill.x,
     originWorld.y - 0.80 * uDownhill.y
   );
   const trackEndWorld = new Vector2(
-    originWorld.x + 5.15 * uDownhill.x,
-    originWorld.y + 5.15 * uDownhill.y
+    originWorld.x + 5.20 * uDownhill.x,
+    originWorld.y + 5.20 * uDownhill.y
   );
 
   return {
@@ -175,7 +175,7 @@ export function computeInclineTransform(
 }
 
 /**
- * Draws a realistic coiled helical compression spring between two world-space points.
+ * Draws a multi-turn helical spring with realistic dynamic pitch and coil tapers.
  */
 export function drawCoiledHelicalSpring(
   ctx: CanvasRenderingContext2D,
@@ -259,6 +259,41 @@ export function drawCoiledHelicalSpring(
   const leadOutScreen = camera.worldToScreen(pLeadOutWorld);
   ctx.lineTo(leadOutScreen.x, leadOutScreen.y);
   ctx.lineTo(endScreen.x, endScreen.y);
+  ctx.stroke();
+
+  // Contact buffer plate at free end of spring
+  const plateHalfWidth = 0.12;
+  const plateThickness = 0.02;
+  const plateP1 = new Vector2(
+    pEndWorld.x + nx * plateHalfWidth,
+    pEndWorld.y + ny * plateHalfWidth
+  );
+  const plateP2 = new Vector2(
+    pEndWorld.x - nx * plateHalfWidth,
+    pEndWorld.y - ny * plateHalfWidth
+  );
+  const plateBackP1 = new Vector2(
+    plateP1.x - ux * plateThickness,
+    plateP1.y - uy * plateThickness
+  );
+  const plateBackP2 = new Vector2(
+    plateP2.x - ux * plateThickness,
+    plateP2.y - uy * plateThickness
+  );
+
+  const sP1 = camera.worldToScreen(plateP1);
+  const sP2 = camera.worldToScreen(plateP2);
+  const sBackP2 = camera.worldToScreen(plateBackP2);
+  const sBackP1 = camera.worldToScreen(plateBackP1);
+
+  ctx.fillStyle = '#CBD5E1';
+  ctx.beginPath();
+  ctx.moveTo(sP1.x, sP1.y);
+  ctx.lineTo(sP2.x, sP2.y);
+  ctx.lineTo(sBackP2.x, sBackP2.y);
+  ctx.lineTo(sBackP1.x, sBackP1.y);
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
 
   ctx.restore();
@@ -391,34 +426,34 @@ export function drawInclineTrack(
     ctx.beginPath();
     ctx.moveTo(sTop.x, sTop.y);
     ctx.lineTo(sBot.x, sBot.y);
-    ctx.strokeStyle = tick.s === 3.5 ? '#38BDF8' : tick.s === 4.9 ? '#F43F5E' : '#94A3B8';
-    ctx.lineWidth = tick.s === 3.5 || tick.s === 4.9 ? 2 : 1;
+    ctx.strokeStyle = '#94A3B8';
+    ctx.lineWidth = tick.s === 0.0 || tick.s === 3.5 || tick.s === 4.9 ? 2.0 : 1.0;
     ctx.stroke();
 
-    // Text label
-    const labelPosWorld = new Vector2(ptWorld.x - 0.16 * uN.x, ptWorld.y - 0.16 * uN.y);
-    const sLabel = camera.worldToScreen(labelPosWorld);
-    ctx.fillText(tick.label, sLabel.x, sLabel.y);
+    // Offset label slightly perpendicular to track
+    const sLabelWorld = new Vector2(ptWorld.x - 0.16 * uN.x, ptWorld.y - 0.16 * uN.y);
+    const sLabelScreen = camera.worldToScreen(sLabelWorld);
+    ctx.fillText(tick.label, sLabelScreen.x, sLabelScreen.y);
   }
 
-  // 3. Spring contact threshold dashed line (s = 3.50 m)
+  // 3. Contact Reference dashed line at s = 3.50 m
   const contactPt = transform.springContactPosWorld;
-  const contactTop = new Vector2(contactPt.x + 0.35 * uN.x, contactPt.y + 0.35 * uN.y);
+  const contactTop = new Vector2(contactPt.x + 0.22 * uN.x, contactPt.y + 0.22 * uN.y);
   const sContactPt = camera.worldToScreen(contactPt);
   const sContactTop = camera.worldToScreen(contactTop);
 
   ctx.beginPath();
-  ctx.setLineDash([3, 3]);
+  ctx.setLineDash([4, 4]);
   ctx.moveTo(sContactPt.x, sContactPt.y);
   ctx.lineTo(sContactTop.x, sContactTop.y);
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)'; // Cyan dashed
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)'; // Cyan dashed
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // 4. Solid height limit threshold line (s = 4.90 m)
+  // 4. Solid Height Limit dashed line at s = 4.90 m
   const solidPt = transform.solidHeightPosWorld;
-  const solidTop = new Vector2(solidPt.x + 0.35 * uN.x, solidPt.y + 0.35 * uN.y);
+  const solidTop = new Vector2(solidPt.x + 0.22 * uN.x, solidPt.y + 0.22 * uN.y);
   const sSolidPt = camera.worldToScreen(solidPt);
   const sSolidTop = camera.worldToScreen(solidTop);
 
@@ -510,11 +545,19 @@ export function drawSlidingBlock(
   ctx.textBaseline = 'middle';
   ctx.fillText(`${mass.toFixed(1)} kg`, centerScreen.x, centerScreen.y);
 
+  // Small contact indicator line on bottom face
+  ctx.beginPath();
+  ctx.moveTo(c0.x, c0.y);
+  ctx.lineTo(c3.x, c3.y);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
   ctx.restore();
 }
 
 /**
- * Draws force and velocity vectors on the block.
+ * Draws labeled force vectors acting on the sliding block.
  */
 export function drawWorkEnergyVectors(
   ctx: CanvasRenderingContext2D,
