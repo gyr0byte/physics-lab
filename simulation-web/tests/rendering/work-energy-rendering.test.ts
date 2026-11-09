@@ -594,47 +594,282 @@ describe('WorkEnergyRenderer — Incline Canvas Rendering Suite', () => {
   // ── 15. Graph Tab Navigation and Focus ─────────────────────────────────
   describe('15. Graph Tab Navigation and Focus', () => {
     it('switches between energy, power, kinematics, and force tabs', () => {
-      const mockCanvas = {
-        getContext: vi.fn(() => createMockContext()),
-        style: {},
-        remove: vi.fn(),
-        width: 302,
-        height: 130,
-        parentElement: { getBoundingClientRect: () => ({ width: 800, height: 600 }) },
-      };
-      const container = {
-        innerHTML: '',
-        appendChild: vi.fn(),
-      } as unknown as HTMLElement;
-
       const origDoc = globalThis.document;
-      const elementsMap: Record<string, HTMLElement> = {};
+      const origWin = globalThis.window;
+      const origRaf = globalThis.requestAnimationFrame;
+      const origCaf = globalThis.cancelAnimationFrame;
+      const origRo = globalThis.ResizeObserver;
+
+      const elementsById = new Map<string, HTMLElement>();
+      const docListeners: Record<string, ((e: unknown) => void)[]> = {};
+      const winListeners: Record<string, ((e: unknown) => void)[]> = {};
+
+      function createStyleProxy(): Record<string, string> {
+        const target: Record<string, string> = {};
+        return new Proxy(target, {
+          set(obj, prop, value) {
+            if (typeof prop === 'string' && prop === 'cssText' && typeof value === 'string') {
+              obj.cssText = value;
+              const declarations = value.split(';');
+              for (const decl of declarations) {
+                const colonIdx = decl.indexOf(':');
+                if (colonIdx > 0) {
+                  const key = decl
+                    .slice(0, colonIdx)
+                    .trim()
+                    .replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+                  const val = decl.slice(colonIdx + 1).trim();
+                  if (key) obj[key] = val;
+                }
+              }
+              return true;
+            }
+            if (typeof prop === 'string') {
+              obj[prop] = value;
+            }
+            return true;
+          },
+        });
+      }
+
+      function createMockElement(tagName: string): HTMLElement {
+        const listeners: Record<string, ((e: unknown) => void)[]> = {};
+        const children: HTMLElement[] = [];
+        let _id = '';
+        let _innerHTML = '';
+
+        const el: unknown = {
+          tagName: tagName.toUpperCase(),
+          get id() {
+            return _id;
+          },
+          set id(val: string) {
+            _id = val;
+            if (val) elementsById.set(val, el as HTMLElement);
+          },
+          get innerHTML() {
+            return _innerHTML;
+          },
+          set innerHTML(val: string) {
+            _innerHTML = val;
+          },
+          textContent: '',
+          className: '',
+          style: createStyleProxy(),
+          dataset: {} as Record<string, string>,
+          tabIndex: 0,
+          children,
+          parentElement: null as HTMLElement | null,
+          appendChild: vi.fn((child: HTMLElement) => {
+            (child as unknown as { parentElement: unknown }).parentElement = el;
+            children.push(child);
+            return child;
+          }),
+          addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+            listeners[event] = listeners[event] || [];
+            listeners[event].push(handler);
+          }),
+          removeEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+            if (listeners[event]) {
+              listeners[event] = listeners[event].filter((h) => h !== handler);
+            }
+          }),
+          dispatchEvent: vi.fn((event: { type: string; defaultPrevented?: boolean }) => {
+            const handlers = listeners[event.type] || [];
+            for (const h of handlers) h(event);
+            return !event.defaultPrevented;
+          }),
+          focus: vi.fn(),
+          remove: vi.fn(),
+          querySelector: vi.fn(() => null),
+          querySelectorAll: vi.fn(() => []),
+          getBoundingClientRect: vi.fn(() => ({
+            width: 800,
+            height: 600,
+            top: 0,
+            left: 0,
+            right: 800,
+            bottom: 600,
+          })),
+        };
+
+        if (tagName === 'canvas') {
+          (el as { width: number; height: number; getContext: unknown }).width = 302;
+          (el as { width: number; height: number; getContext: unknown }).height = 130;
+          (el as { width: number; height: number; getContext: unknown }).getContext = vi.fn(
+            () => createMockContext()
+          );
+        }
+
+        return el as HTMLElement;
+      }
 
       globalThis.document = {
-        createElement: vi.fn((tag: string) => {
-          if (tag === 'canvas') return mockCanvas;
-          const el = {
-            id: '',
-            textContent: '',
-            style: {},
-            tabIndex: 0,
-            dataset: {},
-            appendChild: vi.fn(),
-            addEventListener: vi.fn(),
-            querySelector: vi.fn(() => null),
-            focus: vi.fn(),
-            remove: vi.fn(),
-          } as unknown as HTMLElement;
-          return el;
+        createElement: vi.fn((tag: string) => createMockElement(tag)),
+        getElementById: vi.fn((id: string) => elementsById.get(id) ?? null),
+        addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+          docListeners[event] = docListeners[event] || [];
+          docListeners[event].push(handler);
         }),
-        getElementById: vi.fn((id: string) => elementsMap[id] ?? null),
+        removeEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+          if (docListeners[event]) {
+            docListeners[event] = docListeners[event].filter((h) => h !== handler);
+          }
+        }),
+        dispatchEvent: vi.fn((event: { type: string; defaultPrevented?: boolean }) => {
+          const handlers = docListeners[event.type] || [];
+          for (const h of handlers) h(event);
+          return !event.defaultPrevented;
+        }),
       } as unknown as Document;
 
+      globalThis.window = {
+        devicePixelRatio: 1,
+        addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+          winListeners[event] = winListeners[event] || [];
+          winListeners[event].push(handler);
+        }),
+        removeEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
+          if (winListeners[event]) {
+            winListeners[event] = winListeners[event].filter((h) => h !== handler);
+          }
+        }),
+        dispatchEvent: vi.fn((event: { type: string; defaultPrevented?: boolean }) => {
+          const handlers = winListeners[event.type] || [];
+          for (const h of handlers) h(event);
+          return !event.defaultPrevented;
+        }),
+      } as unknown as Window & typeof globalThis;
+
+      globalThis.requestAnimationFrame = vi.fn(() => 1);
+      globalThis.cancelAnimationFrame = vi.fn();
+
+      class MockResizeObserver {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+      }
+      globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+
+      function dispatchKey(key: string) {
+        const event = {
+          type: 'keydown',
+          key,
+          defaultPrevented: false,
+          preventDefault() {
+            this.defaultPrevented = true;
+          },
+        };
+        globalThis.document.dispatchEvent(event as unknown as Event);
+      }
+
+      let sim: WorkEnergySimulation | null = null;
       try {
-        const sim = new WorkEnergySimulation();
-        expect(sim.metadata.id).toBe('work-energy-power');
+        sim = new WorkEnergySimulation();
+        const rootContainer = createMockElement('div');
+        sim.initialize(rootContainer);
+
+        const btnEnergy = globalThis.document.getElementById('graph-tab-energy')!;
+        const btnPower = globalThis.document.getElementById('graph-tab-power')!;
+        const btnKin = globalThis.document.getElementById('graph-tab-kinematics')!;
+        const btnForce = globalThis.document.getElementById('graph-tab-force')!;
+
+        expect(btnEnergy).toBeDefined();
+        expect(btnPower).toBeDefined();
+        expect(btnKin).toBeDefined();
+        expect(btnForce).toBeDefined();
+
+        const containers = (sim as unknown as { _graphContainers: Record<string, HTMLElement> })._graphContainers;
+
+        // 1. Initial State: Energy tab is active by default
+        expect(containers.energy.style.display).toBe('block');
+        expect(containers.power.style.display).toBe('none');
+        expect(containers.kinematics.style.display).toBe('none');
+        expect(containers.force.style.display).toBe('none');
+        expect(btnEnergy.style.color).toBe('#38BDF8');
+
+        // 2. Navigate D-pad down from parameter 0 to reach graph-tab-energy (10 steps)
+        for (let i = 0; i < 10; i++) {
+          dispatchKey('ArrowDown');
+        }
+
+        // Verify focus reached Energy tab
+        expect((sim as unknown as { _focusedControl: number })._focusedControl).toBe(10);
+        expect(btnEnergy.focus).toHaveBeenCalled();
+        expect(btnEnergy.style.borderColor).toBe('#38BDF8');
+
+        // 3. Move down to Power tab and select it with Enter
+        dispatchKey('ArrowDown');
+        expect((sim as unknown as { _focusedControl: number })._focusedControl).toBe(11);
+        expect(btnPower.focus).toHaveBeenCalled();
+
+        dispatchKey('Enter');
+
+        // Verify Power container is activated and Energy container hidden
+        expect(containers.power.style.display).toBe('block');
+        expect(containers.energy.style.display).toBe('none');
+        expect(containers.kinematics.style.display).toBe('none');
+        expect(containers.force.style.display).toBe('none');
+        expect(btnPower.style.borderColor).toBe('#38BDF8');
+        expect(btnPower.style.color).toBe('#38BDF8');
+        expect(btnEnergy.style.color).toBe('#94A3B8');
+
+        // 4. Move down to Kinematics tab and select it with Enter
+        dispatchKey('ArrowDown');
+        expect((sim as unknown as { _focusedControl: number })._focusedControl).toBe(12);
+        expect(btnKin.focus).toHaveBeenCalled();
+
+        dispatchKey('Enter');
+
+        // Verify Kinematics container is activated
+        expect(containers.kinematics.style.display).toBe('block');
+        expect(containers.power.style.display).toBe('none');
+        expect(containers.energy.style.display).toBe('none');
+        expect(containers.force.style.display).toBe('none');
+        expect(btnKin.style.borderColor).toBe('#38BDF8');
+        expect(btnKin.style.color).toBe('#38BDF8');
+        expect(btnPower.style.color).toBe('#94A3B8');
+
+        // 5. Move down to Force tab and select it with Enter
+        dispatchKey('ArrowDown');
+        expect((sim as unknown as { _focusedControl: number })._focusedControl).toBe(13);
+        expect(btnForce.focus).toHaveBeenCalled();
+
+        dispatchKey('Enter');
+
+        // Verify Force container is activated
+        expect(containers.force.style.display).toBe('block');
+        expect(containers.kinematics.style.display).toBe('none');
+        expect(containers.power.style.display).toBe('none');
+        expect(containers.energy.style.display).toBe('none');
+        expect(btnForce.style.borderColor).toBe('#38BDF8');
+        expect(btnForce.style.color).toBe('#38BDF8');
+        expect(btnKin.style.color).toBe('#94A3B8');
+
+        // 6. Navigate back up to Energy tab and select it with Enter
+        dispatchKey('ArrowUp');
+        dispatchKey('ArrowUp');
+        dispatchKey('ArrowUp');
+        expect((sim as unknown as { _focusedControl: number })._focusedControl).toBe(10);
+        expect(btnEnergy.focus).toHaveBeenCalled();
+
+        dispatchKey('Enter');
+
+        // Verify Energy container is reactivated
+        expect(containers.energy.style.display).toBe('block');
+        expect(containers.force.style.display).toBe('none');
+        expect(containers.kinematics.style.display).toBe('none');
+        expect(containers.power.style.display).toBe('none');
+        expect(btnEnergy.style.borderColor).toBe('#38BDF8');
+        expect(btnEnergy.style.color).toBe('#38BDF8');
+        expect(btnForce.style.color).toBe('#94A3B8');
       } finally {
+        sim?.dispose();
         globalThis.document = origDoc;
+        globalThis.window = origWin;
+        globalThis.requestAnimationFrame = origRaf;
+        globalThis.cancelAnimationFrame = origCaf;
+        globalThis.ResizeObserver = origRo;
       }
     });
   });
