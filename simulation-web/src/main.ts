@@ -2,6 +2,7 @@ import { simulationRegistry } from './core/SimulationRegistry';
 import { ProjectileMotionSimulation } from './simulations/projectile-motion/ProjectileMotionSimulation';
 import { NewtonsSecondLawSimulation } from './simulations/newtons-second-law/NewtonsSecondLawSimulation';
 import { SimpleHarmonicMotionSimulation } from './simulations/simple-harmonic-motion/SimpleHarmonicMotionSimulation';
+import { WorkEnergySimulation } from './simulations/work-energy-power/WorkEnergySimulation';
 import type { Simulation } from './core/Simulation';
 
 // Register all educational physics simulations
@@ -18,6 +19,11 @@ simulationRegistry.register({
 simulationRegistry.register({
   metadata: new SimpleHarmonicMotionSimulation().metadata,
   create: () => new SimpleHarmonicMotionSimulation(),
+});
+
+simulationRegistry.register({
+  metadata: new WorkEnergySimulation().metadata,
+  create: () => new WorkEnergySimulation(),
 });
 
 let activeSimulation: Simulation | null = null;

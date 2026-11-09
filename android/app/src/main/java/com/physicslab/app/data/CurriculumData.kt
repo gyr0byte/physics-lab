@@ -63,7 +63,7 @@ object CurriculumData {
             CurriculumTopic("Vectors", emptyList()),
             CurriculumTopic("Kinematics — Projectile Motion", listOf("projectile-motion")),
             CurriculumTopic("Dynamics — Newton's Laws", listOf("newtons-second-law")),
-            CurriculumTopic("Work, Energy and Power", emptyList()),
+            CurriculumTopic("Work, Energy and Power", listOf("work-energy-power")),
             CurriculumTopic("Circular Motion", emptyList()),
             CurriculumTopic("Gravitation", emptyList()),
             CurriculumTopic("Elasticity", emptyList()),

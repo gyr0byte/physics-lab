@@ -48,6 +48,7 @@ export class Graph {
   pushData(seriesIndex: number, t: number, v: number): void {
     const series = this._series[seriesIndex];
     if (!series) return;
+    if (!Number.isFinite(t) || !Number.isFinite(v)) return;
     series.data.push({ t, v });
     // Bounded buffer
     if (series.data.length > this._maxPoints) {
@@ -149,17 +150,23 @@ export class Graph {
       ctx.stroke();
     }
 
-    // Legend
+    // Legend with wrapping
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = '11px system-ui, -apple-system, sans-serif';
-    let lx = margin.left + 8;
+    ctx.font = '10px system-ui, -apple-system, sans-serif';
+    let lx = margin.left + 4;
+    let ly = 3;
     for (const s of this._series) {
+      const textW = ctx.measureText(s.label).width;
+      if (lx + textW + 16 > w - margin.right && lx > margin.left + 4) {
+        lx = margin.left + 4;
+        ly += 11;
+      }
       ctx.fillStyle = s.color;
-      ctx.fillRect(lx, margin.top + 4, 12, 3);
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
-      ctx.fillText(s.label, lx + 16, margin.top);
-      lx += ctx.measureText(s.label).width + 32;
+      ctx.fillRect(lx, ly + 3, 8, 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillText(s.label, lx + 11, ly);
+      lx += textW + 16;
     }
 
     ctx.restore();

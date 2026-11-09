@@ -330,10 +330,11 @@ export const GRADE_11_CHAPTERS: CurriculumChapter[] = [
     ],
     simulations: [
       {
-        id: 'work-energy-incline',
-        title: 'Mechanical Energy Conservation & Incline',
-        description: 'Track ramp with kinetic, potential, and thermal energy stacked bar charts and spring bumpers.',
-        status: 'Planned',
+        id: 'work-energy-power',
+        title: 'Work, Energy & Power (Inclined Track & Spring Bumper)',
+        description:
+          'Track ramp with sliding block, spring bumper, work-energy theorem, conservative and dissipative forces, and live power calculations.',
+        status: 'Implemented',
         difficulty: 'Medium',
       },
     ],
