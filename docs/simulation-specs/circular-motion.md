@@ -199,7 +199,7 @@ An overhead bird's-eye view of a calibrated circular track/turntable with concen
    - **Numerical Handling & Resticking Transition:**
      1. **Near-Zero Relative Velocity ($|\vec{v}_{\text{rel}}| \le \epsilon_v$):**
         At each integration step, evaluate the local surface acceleration at the puck's current position $\vec{r}$:
-        $$\vec{a}_{\text{surface}}(\vec{r}) = -\omega_{\text{table}}^2 \vec{r} + \alpha_{\text{table}} (-\hat{k} \times \vec{r})$$
+        $$\vec{a}_{\text{surface}}(\vec{r}) = -\omega_{\text{table}}^2 \vec{r} + \alpha_{\text{table}} (\hat{k} \times \vec{r})$$
         - If $|\vec{a}_{\text{surface}}(\vec{r})| \le \mu_s g$, static friction can once again support co-rotation. The relative slip is arrested: set $\vec{v}_{\text{rel}} = \vec{0}$, $\vec{v}_{\text{puck}} = \vec{v}_{\text{surface}}$, and transition back to the static regime (resticking at radius $r' = |\vec{r}|$).
         - If $|\vec{a}_{\text{surface}}(\vec{r})| > \mu_s g$, slip must continue: use the incipient slip direction $\hat{u}_{\text{slip}} = -\frac{\vec{a}_{\text{surface}}}{|\vec{a}_{\text{surface}}|}$ to avoid division by zero.
      2. **Zero Surface Acceleration ($|\vec{a}_{\text{surface}}| \le \epsilon_a$ and $|\vec{v}_{\text{rel}}| \le \epsilon_v$):**
