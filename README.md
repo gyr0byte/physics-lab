@@ -81,9 +81,9 @@ Features four distinct simulation modes covering the complete periodic motion un
   - Physical guide-rail travel limits with non-collapsing terminal state preservation.
 
 ### 4. Work, Energy & Power — *Grade 11, Chapter 5: Work, Energy and Power*
-- **Physics Model:** Incline-aligned 1D coordinate system integrated via a semi-implicit Velocity Verlet numerical engine ($\Delta t = 0.002\text{ s}$).
+- **Physics Model:** Incline-aligned 1D coordinate system integrated via a Velocity Verlet numerical engine ($\Delta t = 0.002\text{ s}$).
 - **Features:** Dynamic sliding block on an inclined track ($10^\circ\text{--}45^\circ$) with Coulomb friction, free flight, guided compression spring bumper at $s = 3.50\text{ m}$, solid spring compression limit at $s = 4.90\text{ m}$, and live energy accounting HUD overlay.
-- **Adjustable Parameters:** Block mass ($m$: $0.5\text{--}10\text{ kg}$), incline angle ($\theta$: $10^\circ\text{--}45^\circ$), kinetic friction coefficient ($\mu_k$: $0.0\text{--}0.50$), static friction coefficient ($\mu_s \ge \mu_k$: $0.0\text{--}0.60$), spring constant ($k$: $10\text{--}200\text{ N/m}$), and quick presets (Frictionless, High Friction, Stiff Spring).
+- **Adjustable Parameters:** Block mass ($m$: $0.5\text{--}5.0\text{ kg}$), incline angle ($\theta$: $10^\circ\text{--}45^\circ$), kinetic friction coefficient ($\mu_k$: $0.0\text{--}0.30$), static friction coefficient ($\mu_s \ge \mu_k$: $0.0\text{--}0.40$), spring constant ($k$: $10\text{--}80\text{ N/m}$), and quick presets (Frictionless, High Friction, Stiff Spring).
 - **Measurements & Analytical Graphs:**
   - Live measurement panel displaying displacement, velocity, acceleration, spring state, work breakdown ($W_g, W_s, W_f, W_{\text{net}}$), and instantaneous/average power.
   - Four selectable real-time graph tabs with legend wrapping and D-pad navigation:
