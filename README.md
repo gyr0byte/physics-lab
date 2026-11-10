@@ -38,17 +38,19 @@ Official Nepal CDC curriculum specifications (`docs/curriculum/`) serve strictly
 | **Newton's Second Law**<br>*Grade 11, Chapter 4: Dynamics* | ![Newton's Second Law](docs/qa/regression/11-newton-initial.png) |
 | **SHM — Free Oscillation**<br>*Grade 12, Chapter 2: Periodic Motion* | ![SHM Free Oscillation](docs/qa/android-runtime/04-shm-free-vertical.png) |
 | **SHM — Mechanical Resonance**<br>*Grade 12, Chapter 2: Periodic Motion* | ![SHM Mechanical Resonance](docs/qa/android-runtime/13-shm-resonance.png) |
+| **Work, Energy & Power**<br>*Grade 11, Chapter 5: Work, Energy and Power* | ![Work, Energy & Power](docs/qa/browser/work-energy-power/1-initial-experiment-view.png) |
 
 Full photographic and screenshot documentation is available in the QA archives:
 - [Complete Simulation Screenshots](docs/qa/screenshots/)
 - [Android Runtime Integration QA Captures](docs/qa/android-runtime/)
 - [Regression Test QA Captures](docs/qa/regression/)
+- [Browser QA Captures — Work, Energy & Power](docs/qa/browser/work-energy-power/)
 
 ---
 
 ## Implemented Simulations
 
-Physics Lab currently includes three fully implemented, curriculum-aligned simulations:
+Physics Lab currently includes four fully implemented, curriculum-aligned simulations:
 
 ### 1. Projectile Motion — *Grade 11, Chapter 3: Kinematics*
 - **Physics Model:** Closed-form analytic 2D kinematics with independent horizontal and vertical equations of motion ($v_x = v_0 \cos\theta$, $y(t) = v_0 \sin\theta \cdot t - \frac{1}{2}gt^2$).
@@ -78,6 +80,18 @@ Features four distinct simulation modes covering the complete periodic motion un
   - Live analytical resonance curve $A(\Omega) = \frac{F_0/m}{\sqrt{(\omega_0^2 - \Omega^2)^2 + 4\gamma^2\Omega^2}}$ with peak resonance marker at $\Omega_r = \sqrt{\omega_0^2 - 2\gamma^2}$ and half-power bandwidth ($\Delta \omega \approx 2\gamma$).
   - Physical guide-rail travel limits with non-collapsing terminal state preservation.
 
+### 4. Work, Energy & Power — *Grade 11, Chapter 5: Work, Energy and Power*
+- **Physics Model:** Incline-aligned 1D coordinate system integrated via a semi-implicit Velocity Verlet numerical engine ($\Delta t = 0.002\text{ s}$).
+- **Features:** Dynamic sliding block on an inclined track ($10^\circ\text{--}45^\circ$) with Coulomb friction, free flight, guided compression spring bumper at $s = 3.50\text{ m}$, solid spring compression limit at $s = 4.90\text{ m}$, and live energy accounting HUD overlay.
+- **Adjustable Parameters:** Block mass ($m$: $0.5\text{--}10\text{ kg}$), incline angle ($\theta$: $10^\circ\text{--}45^\circ$), kinetic friction coefficient ($\mu_k$: $0.0\text{--}0.50$), static friction coefficient ($\mu_s \ge \mu_k$: $0.0\text{--}0.60$), spring constant ($k$: $10\text{--}200\text{ N/m}$), and quick presets (Frictionless, High Friction, Stiff Spring).
+- **Measurements & Analytical Graphs:**
+  - Live measurement panel displaying displacement, velocity, acceleration, spring state, work breakdown ($W_g, W_s, W_f, W_{\text{net}}$), and instantaneous/average power.
+  - Four selectable real-time graph tabs with legend wrapping and D-pad navigation:
+    - **Energy vs. Time:** Tracks kinetic ($K$), gravitational potential ($U_g$), elastic potential ($U_s$), thermal dissipation ($Q$), and conserved total energy ($E_{\text{tot}} = E_0$).
+    - **Power vs. Time:** Real-time component and net instantaneous power ($P_g, P_s, P_f, P_{\text{net}}$).
+    - **Kinematics vs. Time:** Displacement velocity $v(t)$ and acceleration $a(t)$.
+    - **Force vs. Displacement:** Static characteristic curves displaying gravity driving force $F_g$, Hooke's resistance $F_s$, and conservative resultant $F_{\text{cons}} = F_g + F_s$.
+
 *(Note: Additional curriculum topics remain planned for future development and are not listed as implemented.)*
 
 ---
@@ -105,8 +119,10 @@ Physics Lab employs a clean two-layer decoupled architecture:
 │                                                        │
 │  Core Engine:     SimulationRegistry, SimulationClock, │
 │                   Camera2D, Vector2, InputManager      │
-│  Physics Models:  Pure math (analytic + numerical)     │
-│  Renderers:       CanvasRenderer, SHMRenderer, Graph   │
+│  Physics Models:  Pure math (analytic + numerical,     │
+│                   semi-implicit Euler, Verlet)         │
+│  Renderers:       CanvasRenderer, SHMRenderer,         │
+│                   WorkEnergyRenderer, Graph            │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -115,8 +131,8 @@ Physics Lab employs a clean two-layer decoupled architecture:
 | **Android Shell** | TV UI & Navigation | Kotlin, Jetpack Compose for TV 1.1.0, Compose BOM 2026.09.00 |
 | **Packaging** | Local Content Loading | AndroidX WebKit, `WebViewAssetLoader` (zero network calls, strict CORS) |
 | **Engine** | Simulation Core | TypeScript 6.0, HTML5 Canvas 2D, Vite 8.3 |
-| **Physics** | Mathematical Models | Pure TypeScript (analytic kinematics, semi-implicit Euler, damped/forced SHM) |
-| **Verification** | Test Harness | Vitest 5.0 (160 automated tests, 100% passing) |
+| **Physics** | Mathematical Models | Pure TypeScript (analytic kinematics, semi-implicit Euler, damped/forced SHM, Velocity Verlet) |
+| **Verification** | Test Harness | Vitest 5.0 (222 automated tests, 100% passing) |
 | **Build System** | Compilation & Packaging | Android Gradle Plugin (AGP) 9.4.0, Gradle 9.6.1, JDK 17+ |
 
 ---
@@ -140,11 +156,11 @@ Physics Lab supports three unified interaction modes: Android TV remote controls
 
 | Category | Status | Details |
 |---|---|---|
-| **Automated Test Suite** | ✅ **160 / 160 Passing** | 9 test files across core math, physics models, curriculum data, and rendering. |
+| **Automated Test Suite** | ✅ **222 / 222 Passing** | 11 test files across core math, physics models, curriculum data, and rendering. |
 | **TypeScript Typecheck** | ✅ **0 Errors** | Strict type checking (`tsc --noEmit`). |
-| **Web Production Build** | ✅ **Clean** | Bundled via Vite with relative assets (`dist/assets/`, 92.8 kB). |
-| **Android APK Build** | ✅ **Working** | Assembled via Gradle (`app-debug.apk`, 12.5 MB). |
-| **Physical Phone Testing** | ✅ **Verified** | Validated on a physical Samsung Galaxy S21 FE (`[ANDROID-TEST-DEVICE]`, Android 16 / One UI 8.0) via ADB. Tested touch controls, emulated D-pad key events, DPR canvas scaling, and back navigation. |
+| **Web Production Build** | ✅ **Clean** | Bundled via Vite with relative assets (`dist/assets/`, 133.1 kB). |
+| **Android APK Build** | ✅ **Working** | Assembled via Gradle (`app-debug.apk`). |
+| **Physical Phone Testing** | ✅ **Verified** | Validated on a physical Samsung Galaxy S21 FE (`SM-G990E`, Android 16) via ADB. Tested touch controls, D-pad key navigation, tab selection, DPR canvas scaling, and offline WebView execution. |
 | **Physical Android TV Hardware** | ⏳ **Pending** | **Awaiting physical smart TV classroom hardware & physical IR/Bluetooth remote.** |
 
 > [!WARNING]
@@ -172,6 +188,7 @@ Open `http://localhost:5173` in your browser. The application supports URL hash 
 - `http://localhost:5173/#projectile-motion`
 - `http://localhost:5173/#newtons-second-law`
 - `http://localhost:5173/#simple-harmonic-motion`
+- `http://localhost:5173/#work-energy-power`
 
 ### 2. Run Tests & Validation
 
@@ -261,10 +278,12 @@ physics-lab/
 │   │   ├── physics/                   # Pure mathematical models
 │   │   │   ├── NewtonsSecondLawPhysics.ts
 │   │   │   ├── ProjectilePhysics.ts
-│   │   │   └── SimpleHarmonicPhysics.ts
+│   │   │   ├── SimpleHarmonicPhysics.ts
+│   │   │   └── WorkEnergyPhysics.ts
 │   │   ├── rendering/                 # Canvas apparatus renderers
 │   │   │   ├── CanvasRenderer.ts
-│   │   │   └── SHMRenderer.ts
+│   │   │   ├── SHMRenderer.ts
+│   │   │   └── WorkEnergyRenderer.ts
 │   │   ├── components/                # Analytical UI components
 │   │   │   └── Graph.ts
 │   │   ├── curriculum/                # Client-side curriculum metadata
@@ -272,13 +291,14 @@ physics-lab/
 │   │   ├── simulations/               # Simulation implementations
 │   │   │   ├── newtons-second-law/
 │   │   │   ├── projectile-motion/
-│   │   │   └── simple-harmonic-motion/
+│   │   │   ├── simple-harmonic-motion/
+│   │   │   └── work-energy-power/
 │   │   └── main.ts                    # Entry point & hash router
 │   ├── tests/                         # Vitest automated test suite
 │   │   ├── core/                      # Vector2, Clock, Camera2D, Registry tests
 │   │   ├── curriculum/                # Curriculum metadata tests
-│   │   ├── physics/                   # Projectile, Newton, SHM physics tests
-│   │   └── rendering/                 # SHM canvas rendering tests
+│   │   ├── physics/                   # Projectile, Newton, SHM, Work-Energy tests
+│   │   └── rendering/                 # SHM & Work-Energy canvas rendering tests
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vite.config.ts
