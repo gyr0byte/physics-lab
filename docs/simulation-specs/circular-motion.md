@@ -27,24 +27,39 @@ The simulation allows students to experiment with both horizontal and vertical c
 5. **Rotating-Frame Clarification:** Establish that centrifugal force does not exist in an inertial laboratory frame. Any rotating-frame explanation must be explicitly labeled as an apparent/fictitious pseudo-force.
 6. **Non-Uniform Circular Motion:** Model simultaneous tangential and radial accelerations, computing the resultant acceleration vector $\vec{a} = \vec{a}_c + \vec{a}_t = -r\omega^2\hat{r} + r\alpha\hat{\theta}$ with magnitude $|\vec{a}| = \sqrt{a_c^2 + a_t^2} = r\sqrt{\omega^4 + \alpha^2}$ and direction properly handling signed $\omega$ and $\alpha$.
 7. **Motion in a Vertical Circle:**
-   - Unified coordinate convention: $\theta = 0$ corresponds to the **lowest (bottom) point**, $\theta = \pi$ corresponds to the **highest (top) point**, and height above lowest point is $h(\theta) = R(1 - \cos\theta)$.
-   - Verify mechanical energy conservation: $E = \frac{1}{2}mv^2 + mgR(1 - \cos\theta) = \text{constant}$.
-   - Radial tension equation: $T(\theta) = \frac{mv(\theta)^2}{R} + mg\cos\theta$.
+   - Unified coordinate convention: $\theta = 0$ corresponds to the **lowest (bottom) point**, $\theta = \pi/2$ corresponds to the **horizontal position**, $\theta = \pi$ corresponds to the **highest (top) point**, and height above lowest point is $h(\theta) = R(1 - \cos\theta)$.
+   - Mechanical energy conservation: $E = \frac{1}{2}mv^2 + mgR(1 - \cos\theta) = \text{constant}$.
+   - Net inward radial force balance:
+     $$T - mg\cos\theta = \frac{mv^2}{R} \implies T(\theta) = \frac{mv(\theta)^2}{R} + mg\cos\theta$$
+   - Detailed force action:
+     - String tension $T$ always pulls inward toward the pivot.
+     - In the lower half ($\theta < \pi/2, \cos\theta > 0$), weight has an outward radial component ($mg\cos\theta > 0$) opposing tension, requiring $T = mv^2/R + mg\cos\theta > mv^2/R$.
+     - In the upper half ($\theta > \pi/2, \cos\theta < 0$), weight has an inward radial component ($-mg\cos\theta > 0$) assisting tension, yielding $T = mv^2/R - mg|\cos\theta|$.
+   - Boundary checks:
+     - Bottom ($\theta = 0$): $T - mg = \frac{mv_0^2}{R} \implies T_{\text{bottom}} = \frac{mv_0^2}{R} + mg$.
+     - Horizontal ($\theta = \pi/2$): $\cos(\pi/2) = 0 \implies T_{\text{horiz}} = \frac{mv_{\text{horiz}}^2}{R}$.
+     - Top ($\theta = \pi$): $\cos\pi = -1 \implies T + mg = \frac{mv_{\text{top}}^2}{R} \implies T_{\text{top}} = \frac{mv_{\text{top}}^2}{R} - mg$.
    - Comprehensive boundary conditions:
      1. $v_0 = 0$: Bob at rest at bottom ($h = 0, T = mg$).
      2. $v_0 < \sqrt{2gR}$: Stable oscillatory pendulum regime ($h < R, \theta < \pi/2, T > 0$ strictly at all times).
      3. $v_0 = \sqrt{2gR}$: Boundary state where bob reaches horizontal position $\theta = \pi/2$ ($h = R$) with simultaneous $v = 0$ and $T = 0$.
-     4. $\sqrt{2gR} < v_0 < \sqrt{5gR}$: Slackening regime. Tension vanishes ($T = 0$) at $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (\pi/2, \pi)$. The bob transitions into free parabolic projectile motion under gravity until the string taut transition condition ($|\vec{r}| \ge R$ and $\vec{r}\cdot\vec{v} > 0$) is satisfied, at which point an impulsive radial arrest sets $\vec{v}_{\text{taut}} = v_\theta\hat{\theta}$ with kinetic energy loss $\Delta E = \frac{1}{2}m(\vec{v}\cdot\hat{r})^2$.
+     4. $\sqrt{2gR} < v_0 < \sqrt{5gR}$: Slackening regime. Tension vanishes ($T = 0$) at slack angle $\theta_{\text{slack}} \in (\pi/2, \pi)$, where $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$. The bob transitions into free parabolic projectile motion under gravity until the string taut transition condition ($g_{\text{event}}(t) = |\vec{r}(t)| - R = 0$ with $\vec{r}\cdot\vec{v} > 0$) is localized, at which point an impulsive radial arrest sets $\vec{v}_{\text{taut}} = v_\theta\hat{\theta}$ with kinetic energy loss $\Delta E = \frac{1}{2}m(\vec{v}\cdot\hat{r})^2$. If post-impact required tension $T_{\text{post}} < 0$, the flexible string immediately re-slackens.
      5. $v_0 \ge \sqrt{5gR}$: Complete circular loop without slackening ($T \ge 0$ throughout), satisfying the classic invariant $T_{\text{bottom}} - T_{\text{top}} = 6mg$.
 8. **Level & Banked Road Dynamics:**
    - Level circular track: Centripetal force supplied solely by static friction ($v_{\max} = \sqrt{\mu_s rg}$).
-   - Ideal frictionless banked curve: Optimal design speed $v_{\text{opt}} = \sqrt{rg\tan\theta}$ where normal force component $N\sin\theta$ provides exact centripetal requirement without lateral tire shear.
-   - Banked curve with friction: Upper speed threshold $v_{\max} = \sqrt{rg \frac{\mu_s + \tan\theta}{1 - \mu_s\tan\theta}}$ and lower slip-down threshold $v_{\min} = \sqrt{rg \frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}}$ (for $\tan\theta > \mu_s$).
+   - Ideal frictionless banked curve: Optimal design speed $v_{\text{opt}} = \sqrt{rg\tan\theta}$ where normal force component $N\sin\theta$ provides exact centripetal requirement without lateral tire shear ($f_s = 0$).
+   - Banked curve with friction:
+     - Normal reaction: $N = \frac{mg + f_s\sin\theta}{\cos\theta} = m\left[g\cos\theta + \frac{v^2}{r}\sin\theta\right]$.
+     - Signed static friction force (positive down the incline):
+       $$f_s = m\left[\frac{v^2}{r}\cos\theta - g\sin\theta\right]$$
+     - Static equilibrium requires $|f_s| \le \mu_s N$.
+     - Upper speed threshold (skidding outward): $v_{\max} = \sqrt{rg \frac{\tan\theta + \mu_s}{1 - \mu_s\tan\theta}}$ (for $\mu_s\tan\theta < 1$).
+     - Lower speed threshold (sliding inward): $v_{\min} = \sqrt{rg \frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}}$ (for $\tan\theta > \mu_s$).
 9. **Conical Pendulum:**
    - Bob suspended by string of length $L$ circulating in a horizontal plane with semi-vertical angle $\theta$ and orbital radius $r = L\sin\theta$.
    - Balance of vertical tension component against gravity ($T\cos\theta = mg$) and horizontal component providing centripetal force ($T\sin\theta = m\omega^2 r$).
    - Mass-independent time period: $T_{\text{period}} = 2\pi\sqrt{\frac{L\cos\theta}{g}} = 2\pi\sqrt{\frac{h}{g}}$.
-   - Exact small-angle relation $\frac{T_{\text{conical}}}{T_{\text{small-angle}}} = \sqrt{\cos\theta}$, giving a small-angle deviation within $0.1\%$ for $\theta \le 3^\circ$ and $0.2\%$ for $\theta \le 5^\circ$ (where deviation is $1 - \sqrt{\cos 5^\circ} \approx 0.19\%$).
+   - Exact small-angle relation $\frac{T_{\text{conical}}}{T_0} = \sqrt{\cos\theta}$, giving a small-angle deviation within $0.1\%$ for $\theta \le 3^\circ$ and $0.2\%$ for $\theta \le 5^\circ$ (where deviation is $1 - \sqrt{\cos 5^\circ} \approx 0.19\%$).
 
 ---
 
@@ -114,7 +129,7 @@ An overhead bird's-eye view of a calibrated circular track/turntable with concen
 - Velocity vector: $\vec{v}(t) = v_t(t)\hat{\theta} = -r\omega\sin\theta\,\hat{i} + r\omega\cos\theta\,\hat{j}$.
 - Centripetal acceleration:
   $$\vec{a}_c(t) = -r\omega^2\hat{r} = -\frac{v^2}{r}\hat{r} = -r\omega^2(\cos\theta\,\hat{i} + \sin\theta\,\hat{j})$$
-  Magnitude is strictly $a_c = \frac{v^2}{r} = r\omega^2$. Note: $a_c$ is always directed radially inward towards the origin, independent of the sign of $\omega$.
+  Magnitude is strictly $a_c = \frac{v^2}{r} = r\omega^2$. Note: $\vec{a}_c$ is always directed radially inward towards the origin, independent of the sign of $\omega$.
 - Tangential acceleration:
   $$\vec{a}_t(t) = r\alpha\hat{\theta} = a_t\hat{\theta} = -r\alpha\sin\theta\,\hat{i} + r\alpha\cos\theta\,\hat{j}$$
   where $a_t = r\alpha$ is signed. If $\alpha > 0$, $\vec{a}_t$ points counter-clockwise; if $\alpha < 0$, it points clockwise.
@@ -146,34 +161,51 @@ An overhead bird's-eye view of a calibrated circular track/turntable with concen
    - Net force on puck: $F_{\text{net}} = m\sqrt{(r\omega^2)^2 + (r\alpha)^2}$. No radial or tangential detachment occurs.
 
 2. **Mode B: `Friction Surface` (Unattached Puck on Rotating Turntable):**
-   - The turntable rotates in the inertial laboratory frame with angular velocity $\vec{\omega}_{\text{table}} = \omega(t)\hat{k}$ and angular acceleration $\vec{\alpha}_{\text{table}} = \alpha\hat{k}$.
+   - The turntable rotates in the inertial laboratory frame with angular velocity $\vec{\omega}_{\text{table}} = \omega_{\text{table}}(t)\hat{k}$ and angular acceleration $\vec{\alpha}_{\text{table}} = \alpha_{\text{table}}\hat{k}$.
+   - **Co-rotating Surface Acceleration:**
+     At the contact radius $\vec{r} = r\hat{r}$, the kinematic acceleration of the turntable surface itself is:
+     $$\vec{a}_{\text{surface}} = -r\omega_{\text{table}}^2\hat{r} + r\alpha_{\text{table}}\hat{\theta}$$
+     with magnitude $|\vec{a}_{\text{surface}}| = \sqrt{(r\omega_{\text{table}}^2)^2 + (r\alpha_{\text{table}})^2} = r\sqrt{\omega_{\text{table}}^4 + \alpha_{\text{table}}^2}$.
    - **Static Adherence Regime (No Slip):**
-     While the puck does not slip relative to the turntable, it co-rotates at fixed radius $r$:
-     $$\theta(t + \Delta t) = \theta(t) + \omega(t)\Delta t + \frac{1}{2}\alpha\Delta t^2, \quad \omega(t + \Delta t) = \omega(t) + \alpha\Delta t$$
-     To maintain this motion, static friction $\vec{f}_s$ must provide both the centripetal and tangential accelerations:
-     $$\vec{F}_{\text{required}} = -m r \omega^2\hat{r} + m r \alpha\hat{\theta}$$
-     $$F_{\text{required}} = |\vec{F}_{\text{required}}| = m\sqrt{(r\omega^2)^2 + (r\alpha)^2}$$
+     Before breakaway, the puck co-rotates statically with the turntable surface:
+     $$\vec{r}(t) = r\cos\theta(t)\,\hat{i} + r\sin\theta(t)\,\hat{j}, \quad \vec{v}_{\text{puck}}(t) = \vec{v}_{\text{surface}}(t)$$
+     To maintain co-rotation, static friction $\vec{f}_s$ must supply the required surface acceleration:
+     $$\vec{F}_{\text{required}} = m \vec{a}_{\text{surface}} = -m r \omega_{\text{table}}^2\hat{r} + m r \alpha_{\text{table}}\hat{\theta}$$
+     $$F_{\text{required}} = |\vec{F}_{\text{required}}| = m |\vec{a}_{\text{surface}}| = m\sqrt{(r\omega_{\text{table}}^2)^2 + (r\alpha_{\text{table}})^2}$$
      Maximum available static friction:
      $$f_{s,\max} = \mu_s N = \mu_s m g$$
    - **Static Breakaway Criterion:**
-     The puck breaks away from static circular adherence if:
-     $$F_{\text{required}} > f_{s,\max} \iff m\sqrt{(r\omega^2)^2 + (r\alpha)^2} > \mu_s m g \iff \sqrt{(r\omega^2)^2 + (r\alpha)^2} > \mu_s g$$
-   - **Post-Breakaway Kinetic Slip Dynamics:**
-     Once breakaway occurs, the puck becomes an independent body sliding across the rotating surface in the 2D plane.
-     At any instant $t$, let the puck's position in the inertial frame be $\vec{r} = (x, y)$ and velocity be $\vec{v}_{\text{puck}} = (v_x, v_y)$.
-     The velocity of the rotating turntable surface directly beneath the puck at position $\vec{r}$ is:
-     $$\vec{v}_{\text{surface}} = \vec{\omega}_{\text{table}} \times \vec{r} = (-\omega_{\text{table}} y)\,\hat{i} + (\omega_{\text{table}} x)\,\hat{j}$$
-     The relative slip velocity between the puck and the turntable surface is:
+     Breakaway from static adherence occurs when the required acceleration exceeds the static friction limit:
+     $$F_{\text{required}} > f_{s,\max} \iff m |\vec{a}_{\text{surface}}| > \mu_s m g \iff |\vec{a}_{\text{surface}}| > \mu_s g$$
+     $$\iff \sqrt{(r\omega_{\text{table}}^2)^2 + (r\alpha_{\text{table}})^2} > \mu_s g$$
+   - **Breakaway Event at Zero Relative Velocity ($\vec{v}_{\text{rel}} = \vec{0}$):**
+     At the exact onset instant $t = t_{\text{break}}$, the relative velocity between puck and surface is identically zero: $\vec{v}_{\text{rel}} = \vec{v}_{\text{puck}} - \vec{v}_{\text{surface}} = \vec{0}$. The standard kinetic friction formula $-\mu_k mg \frac{\vec{v}_{\text{rel}}}{|\vec{v}_{\text{rel}}|}$ cannot be evaluated directly due to a $0/0$ singularity.
+     The incipient slip direction is determined from the surface/puck acceleration mismatch:
+     In the reference frame of the turntable surface at the contact point, the contact point accelerates at $\vec{a}_{\text{surface}}$. Once static friction breaks away, contact interaction drops to kinetic friction $\vec{F}_k$, which can accelerate the puck in the lab frame by at most $\mu_k g$ in the direction of surface motion.
+     The relative acceleration of the puck with respect to the accelerating surface is:
+     $$\vec{a}_{\text{rel}} = \vec{a}_{\text{puck}} - \vec{a}_{\text{surface}} = \mu_k g \frac{\vec{a}_{\text{surface}}}{|\vec{a}_{\text{surface}}|} - \vec{a}_{\text{surface}} = -\left(1 - \frac{\mu_k g}{|\vec{a}_{\text{surface}}|}\right)\vec{a}_{\text{surface}}$$
+     Because $|\vec{a}_{\text{surface}}| > \mu_s g \ge \mu_k g$, the scalar coefficient $\left(1 - \frac{\mu_k g}{|\vec{a}_{\text{surface}}|}\right) > 0$.
+     Therefore, the incipient relative slip direction $\hat{u}_{\text{slip}}$ is strictly opposite to the surface acceleration:
+     $$\hat{u}_{\text{slip}} = \lim_{\Delta t \to 0^+} \frac{\vec{v}_{\text{rel}}}{|\vec{v}_{\text{rel}}|} = -\frac{\vec{a}_{\text{surface}}}{|\vec{a}_{\text{surface}}|}$$
+     Because kinetic friction opposes relative slip, the kinetic friction force acting on the puck at the breakaway instant is initialized as:
+     $$\vec{F}_k = -\mu_k m g \hat{u}_{\text{slip}} = +\mu_k m g \frac{\vec{a}_{\text{surface}}}{|\vec{a}_{\text{surface}}|}$$
+     which accelerates the puck in the laboratory frame along $+\vec{a}_{\text{surface}}$ with magnitude $a_{\text{puck}} = \mu_k g$.
+   - **Post-Breakaway Kinetic Slip Dynamics ($|\vec{v}_{\text{rel}}| > 0$):**
+     Once the relative velocity becomes nonzero ($|\vec{v}_{\text{rel}}| > \epsilon_v$, where $\epsilon_v = 10^{-4}\text{ m/s}$), the ordinary kinetic friction vector opposing relative slip governs motion:
+     $$\vec{v}_{\text{surface}}(\vec{r}) = \vec{\omega}_{\text{table}} \times \vec{r} = (-\omega_{\text{table}} y)\,\hat{i} + (\omega_{\text{table}} x)\,\hat{j}$$
      $$\vec{v}_{\text{rel}} = \vec{v}_{\text{puck}} - \vec{v}_{\text{surface}}$$
-     When $|\vec{v}_{\text{rel}}| > 0$, kinetic friction opposes this relative motion:
      $$\vec{F}_k = -\mu_k m g \frac{\vec{v}_{\text{rel}}}{|\vec{v}_{\text{rel}}|}$$
-     The puck's acceleration in the inertial frame is given by:
-     $$\vec{a}_{\text{puck}} = \frac{\vec{F}_k}{m} = -\mu_k g \frac{\vec{v}_{\text{rel}}}{|\vec{v}_{\text{rel}}|}$$
-     Integrated with time step $\Delta t = 0.002\text{ s}$ via Velocity Verlet or semi-implicit Euler.
-   - **Zero-Relative-Velocity Transition (Re-adherence / Resticking):**
-     If $|\vec{v}_{\text{rel}}| \le \epsilon_v$ (where $\epsilon_v = 10^{-3}\text{ m/s}$), and the static force required to hold the puck at its instantaneous radius $r' = |\vec{r}|$ satisfies:
-     $$m\sqrt{(r'\omega_{\text{table}}^2)^2 + (r'\alpha_{\text{table}})^2} \le \mu_s m g$$
-     the relative slip ceases ($\vec{v}_{\text{rel}} = \vec{0}$), and the puck re-adheres to the rotating turntable at radius $r'$. Otherwise, the puck continues slipping until it leaves the turntable boundary ($r > R_{\text{turntable}} = 5.0\text{ m}$) or comes to rest.
+     $$\frac{d\vec{v}_{\text{puck}}}{dt} = \frac{\vec{F}_k}{m} = -\mu_k g \frac{\vec{v}_{\text{rel}}}{|\vec{v}_{\text{rel}}|}$$
+   - **Numerical Handling & Resticking Transition:**
+     1. **Near-Zero Relative Velocity ($|\vec{v}_{\text{rel}}| \le \epsilon_v$):**
+        At each integration step, evaluate the local surface acceleration at the puck's current position $\vec{r}$:
+        $$\vec{a}_{\text{surface}}(\vec{r}) = -\omega_{\text{table}}^2 \vec{r} + \alpha_{\text{table}} (-\hat{k} \times \vec{r})$$
+        - If $|\vec{a}_{\text{surface}}(\vec{r})| \le \mu_s g$, static friction can once again support co-rotation. The relative slip is arrested: set $\vec{v}_{\text{rel}} = \vec{0}$, $\vec{v}_{\text{puck}} = \vec{v}_{\text{surface}}$, and transition back to the static regime (resticking at radius $r' = |\vec{r}|$).
+        - If $|\vec{a}_{\text{surface}}(\vec{r})| > \mu_s g$, slip must continue: use the incipient slip direction $\hat{u}_{\text{slip}} = -\frac{\vec{a}_{\text{surface}}}{|\vec{a}_{\text{surface}}|}$ to avoid division by zero.
+     2. **Zero Surface Acceleration ($|\vec{a}_{\text{surface}}| \le \epsilon_a$ and $|\vec{v}_{\text{rel}}| \le \epsilon_v$):**
+        If both the turntable surface acceleration and the puck relative velocity are zero (turntable stationary and puck at rest), set $\vec{F}_k = \vec{0}$.
+     3. **Non-Finite Protection:**
+        Validate all state variables using `Number.isFinite(...)` at each substep. If non-finite values arise, reset the puck state cleanly.
 
 #### E. Vector Visualizations (Toggled via Overlay Checkboxes)
 - Velocity vector $\vec{v}$ (Cyan, tangential: $v_t\hat{\theta}$).
@@ -219,13 +251,22 @@ A vertical plane apparatus showing a mass $m$ attached to a pivot $(0, 0)$ by a 
 - Mechanical Energy Conservation:
   $$E = \frac{1}{2}m v_0^2 = \frac{1}{2}m v(\theta)^2 + mgh(\theta) = \frac{1}{2}m v(\theta)^2 + mgR(1 - \cos\theta)$$
   $$v(\theta) = \sqrt{v_0^2 - 2gR(1 - \cos\theta)}$$
-- Radial Dynamic Equilibrium & String Tension:
-  Inward centripetal acceleration is $a_c = \frac{v^2}{R}$. The forces acting along the inward radial direction are tension $T$ (always inward along the string) and the radial component of gravity $mg\cos\theta$ (inward in lower half $\theta < \pi/2$ where $\cos\theta > 0$, outward in upper half $\theta > \pi/2$ where $\cos\theta < 0$):
-  $$F_{\text{inward}} = T + mg\cos\theta = \frac{mv^2}{R}$$
-  $$T(\theta) = \frac{mv(\theta)^2}{R} + mg\cos\theta$$
-  - At bottom ($\theta = 0$): $\cos 0 = 1 \implies T_{\text{bottom}} = \frac{mv_0^2}{R} + mg$.
-  - At horizontal ($\theta = \pi/2$): $\cos(\pi/2) = 0 \implies T_{\text{horiz}} = \frac{mv_{\text{horiz}}^2}{R} = \frac{m(v_0^2 - 2gR)}{R}$.
-  - At top ($\theta = \pi$): $\cos\pi = -1 \implies T_{\text{top}} = \frac{mv_{\text{top}}^2}{R} - mg$.
+- Radial Dynamic Inward Equilibrium & String Tension:
+  Along the unit inward radial direction $-\hat{r} = -\sin\theta\,\hat{i} + \cos\theta\,\hat{j}$:
+  - Tension $T$ always acts inward toward the pivot ($+T$).
+  - Weight $\vec{W} = -mg\hat{j}$ has an inward radial component:
+    $$W_{\text{inward}} = \vec{W} \cdot (-\hat{r}) = (-mg\hat{j})\cdot(-\sin\theta\,\hat{i} + \cos\theta\,\hat{j}) = -mg\cos\theta$$
+  - Centripetal acceleration is inward: $a_c = \frac{v^2}{R}$.
+  - Applying Newton's second law along the inward radial direction:
+    $$F_{\text{net, inward}} = T - mg\cos\theta = \frac{mv^2}{R}$$
+    $$T(\theta) = \frac{mv(\theta)^2}{R} + mg\cos\theta$$
+  - Physical interpretation of weight action:
+    - In the lower half ($\theta < \pi/2, \cos\theta > 0$), weight has an outward radial component ($mg\cos\theta > 0$) directed away from the pivot. Tension must overcome this outward component and simultaneously provide the centripetal acceleration: $T = mv^2/R + mg\cos\theta > mv^2/R$.
+    - In the upper half ($\theta > \pi/2, \cos\theta < 0$), weight has an inward radial component ($-mg\cos\theta > 0$) directed toward the pivot, assisting tension in supplying the centripetal acceleration: $T = mv^2/R - mg|\cos\theta| < mv^2/R$.
+  - Verification at primary points:
+    - At bottom ($\theta = 0$): $\cos 0 = 1 \implies T - mg = \frac{mv_0^2}{R} \implies T_{\text{bottom}} = \frac{mv_0^2}{R} + mg$.
+    - At horizontal ($\theta = \pi/2$): $\cos(\pi/2) = 0 \implies T = \frac{mv_{\text{horiz}}^2}{R} = \frac{m(v_0^2 - 2gR)}{R}$.
+    - At top ($\theta = \pi$): $\cos\pi = -1 \implies T + mg = \frac{mv_{\text{top}}^2}{R} \implies T_{\text{top}} = \frac{mv_{\text{top}}^2}{R} - mg$.
 
 #### C. User-Adjustable Parameters
 
@@ -261,26 +302,35 @@ A vertical plane apparatus showing a mass $m$ attached to a pivot $(0, 0)$ by a 
      $$T(\theta_{\text{slack}}) = 0 \implies \frac{mv_{\text{slack}}^2}{R} + mg\cos\theta_{\text{slack}} = 0 \implies v_{\text{slack}}^2 = -gR\cos\theta_{\text{slack}}$$
      Substituting into energy conservation:
      $$-gR\cos\theta_{\text{slack}} = v_0^2 - 2gR(1 - \cos\theta_{\text{slack}})$$
-     $$\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR}$$
+     $$\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$$
    - Since $\sqrt{2gR} < v_0 < \sqrt{5gR}$, we have $0 < v_0^2 - 2gR < 3gR$, guaranteeing $-1 < \cos\theta_{\text{slack}} < 0$ and $\frac{\pi}{2} < \theta_{\text{slack}} < \pi$.
    - **Projectile Flight:** At $\theta_{\text{slack}}$, the flexible string becomes slack ($T = 0$). The bob leaves circular motion and travels along a free parabolic trajectory under gravity:
      $$\vec{a}(t) = -g\hat{j}$$
      $$\vec{r}(t) = \vec{r}_{\text{slack}} + \vec{v}_{\text{slack}} \Delta t - \frac{1}{2}g(\Delta t)^2\hat{j}$$
      $$\vec{v}(t) = \vec{v}_{\text{slack}} - g\Delta t\,\hat{j}$$
      where $\vec{r}_{\text{slack}} = R\sin\theta_{\text{slack}}\hat{i} - R\cos\theta_{\text{slack}}\hat{j}$ and $\vec{v}_{\text{slack}} = v_{\text{slack}}(\cos\theta_{\text{slack}}\hat{i} + \sin\theta_{\text{slack}}\hat{j})$.
-   - **Slack-to-Taut Transition Condition:**
+   - **Numerical Event Localization of Slack-to-Taut Transition:**
      While in projectile flight, the distance from pivot is $|\vec{r}(t)| < R$.
-     The transition occurs at the exact moment the projectile path reaches string length:
-     $$|\vec{r}(t)| \ge R \quad \text{and} \quad \vec{r}(t) \cdot \vec{v}(t) > 0$$
-     (i.e., radius is fully extended and the velocity vector has an outward radial component).
-   - **Impulsive Radial Arrest & Energy Loss:**
-     The light inextensible string cannot stretch, producing an impulsive tension shock along $\hat{r} = \frac{\vec{r}}{|\vec{r}|}$.
-     The outward radial velocity component $v_r = \vec{v} \cdot \hat{r} > 0$ is instantaneously arrested to zero:
-     $$\vec{v}_{\text{taut}} = v_\theta \hat{\theta} = (\vec{v} \cdot \hat{\theta})\hat{\theta}$$
-     where $\hat{\theta} = -\frac{y}{R}\hat{i} + \frac{x}{R}\hat{j}$.
-     The radial kinetic energy is dissipated into inelastic string jerk:
-     $$\Delta E_{\text{lost}} = \frac{1}{2}m v_r^2 = \frac{1}{2}m (\vec{v} \cdot \hat{r})^2$$
-     The bob resumes circular motion along the perimeter with reduced mechanical energy $E_{\text{new}} = \frac{1}{2}m v_\theta^2 + mgh$.
+     The string-length boundary event is detected using the continuous event function:
+     $$g_{\text{event}}(t) = |\vec{r}(t)| - R = 0 \quad \text{subject to} \quad \vec{r}(t) \cdot \vec{v}(t) > 0$$
+     When an outward boundary crossing is detected between steps $t_n$ and $t_{n+1}$, the exact event time $t^* \in [t_n, t_{n+1}]$ where $g_{\text{event}}(t^*) = 0$ is localized numerically via root-finding (e.g. bisection or exact quadratic solution of $|\vec{r}_n + \vec{v}_n \tau - \frac{1}{2}g\tau^2\hat{j}|^2 = R^2$) to a tolerance of $\le 10^{-6}\text{ s}$.
+   - **Impulsive Radial Constraint Arrest & Energy Loss:**
+     At the event state $\vec{r}^* = \vec{r}(t^*)$ ($|\vec{r}^*| = R$), define:
+     $$\hat{r} = \frac{\vec{r}^*}{R}, \quad \hat{\theta} = -\frac{y^*}{R}\hat{i} + \frac{x^*}{R}\hat{j}$$
+     Pre-impact velocity $\vec{v}^-$ is decomposed into radial and tangential components:
+     $$v_r^- = \vec{v}^- \cdot \hat{r} > 0, \quad v_\theta^- = \vec{v}^- \cdot \hat{\theta}$$
+     The inextensible string provides an instantaneous impulsive tension along $-\hat{r}$. The outward radial velocity is completely removed:
+     $$v_r^+ = 0, \quad \vec{v}^+ = v_\theta^- \hat{\theta}$$
+     The impulsive constraint arrest dissipates the radial kinetic energy:
+     $$\Delta E_{\text{lost}} = \frac{1}{2}m (v_r^-)^2$$
+     Mechanical energy immediately post-impact:
+     $$E^+ = E^- - \Delta E_{\text{lost}} = \frac{1}{2}m (v_\theta^-)^2 + mg(y^* + R)$$
+   - **Post-Impact Tension Admissibility Check:**
+     Using post-impact tangential speed $|v_\theta^-|$ and angular position $\theta^*$:
+     Compute required constraint tension:
+     $$T_{\text{post}} = \frac{m (v_\theta^-)^2}{R} + mg\cos\theta^*$$
+     - If $T_{\text{post}} \ge -\epsilon_T$ (where $\epsilon_T = 10^{-6}\text{ N}$ tolerance), tension is physically valid ($T \ge 0$). The string remains taut and circular motion resumes along the arc with initial speed $|v_\theta^-|$.
+     - If $T_{\text{post}} < -\epsilon_T$, a flexible string cannot support compression ($T < 0$). The taut circular constraint is not enforced; the string immediately re-slackens, and the bob continues in free-fall projectile motion with velocity $\vec{v}^+$.
 
 5. **Regime 5: Complete Vertical Loop ($v_0 \ge \sqrt{5gR}$)**
    - The bob successfully traverses the highest point ($\theta = \pi$) without the string going slack ($T_{\text{top}} \ge 0$).
@@ -333,36 +383,51 @@ A dual-view display:
 #### C. Governing Equations & Regimes
 
 1. **Horizontal and Vertical Force Equilibrium:**
-   - Vertical balance (no vertical acceleration):
-     $$N\cos\theta - f_s\sin\theta - mg = 0 \quad (\text{if } f_s \text{ acts down incline})$$
-     $$N\cos\theta + f_s\sin\theta - mg = 0 \quad (\text{if } f_s \text{ acts up incline})$$
-   - Radial horizontal force providing centripetal acceleration:
-     $$F_c = \frac{m v^2}{r} = N\sin\theta + f_s\cos\theta \quad (\text{if } f_s \text{ acts down incline})$$
-     $$F_c = \frac{m v^2}{r} = N\sin\theta - f_s\cos\theta \quad (\text{if } f_s \text{ acts up incline})$$
+   Using the sign convention where static friction $f_s$ is defined as **positive when acting downward along the incline** (towards the inside of the turn):
+   - Vertical equilibrium (zero vertical acceleration):
+     $$N\cos\theta - f_s\sin\theta = mg$$
+   - Horizontal radial equation (providing centripetal acceleration):
+     $$N\sin\theta + f_s\cos\theta = \frac{mv^2}{r}$$
 
-2. **Case A: Level Road ($\theta = 0^\circ$):**
-   $$N = mg, \quad f_s = \frac{mv^2}{r}$$
-   - Slip occurs if $f_s > \mu_s N$:
-     $$v_{\max} = \sqrt{\mu_s r g}$$
+2. **Exact Closed-Form Solution for Friction and Normal Reaction:**
+   Solving the linear system simultaneously:
+   - Multiply the horizontal equation by $\cos\theta$ and the vertical equation by $\sin\theta$, then subtract:
+     $$(N\sin\theta\cos\theta + f_s\cos^2\theta) - (N\cos\theta\sin\theta - f_s\sin^2\theta) = \frac{mv^2}{r}\cos\theta - mg\sin\theta$$
+     $$f_s(\cos^2\theta + \sin^2\theta) = m\left[\frac{v^2}{r}\cos\theta - g\sin\theta\right]$$
+     $$f_s = m\left[\frac{v^2}{r}\cos\theta - g\sin\theta\right]$$
+   - Normal reaction:
+     $$N = \frac{mg + f_s\sin\theta}{\cos\theta} = m\left[g\cos\theta + \frac{v^2}{r}\sin\theta\right]$$
+   - Physical interpretation of signed friction:
+     - $f_s > 0$: Friction acts **downward along the incline** (vehicle speed exceeds design speed: $v > v_{\text{opt}}$, preventing outward skidding).
+     - $f_s < 0$: Friction acts **upward along the incline** (vehicle speed is below design speed: $v < v_{\text{opt}}$, preventing inward sliding down the bank).
+     - $f_s = 0$: Friction is zero (ideal frictionless design speed: $v = v_{\text{opt}} = \sqrt{rg\tan\theta}$).
+   - Static equilibrium requires $|f_s| \le \mu_s N$.
 
-3. **Case B: Ideal (Frictionless) Banking ($f_s = 0$):**
-   $$N\cos\theta = mg \implies N = \frac{mg}{\cos\theta}$$
-   $$F_c = N\sin\theta = mg\tan\theta = \frac{mv^2}{r}$$
-   $$\tan\theta = \frac{v_{\text{opt}}^2}{rg} \implies v_{\text{opt}} = \sqrt{rg\tan\theta}$$
-   - If vehicle travels at exactly $v = v_{\text{opt}}$, zero lateral friction is required. Tires experience no lateral wear.
+3. **Case A: Level Road Limit ($\theta = 0^\circ$):**
+   $$f_s = m\left[\frac{v^2}{r}(1) - g(0)\right] = \frac{mv^2}{r}, \quad N = mg$$
+   - Outward skid occurs when $f_s > \mu_s N$:
+     $$v_{\max} = \sqrt{\mu_s rg}$$
 
-4. **Case C: Banked Road with Static Friction ($\mu_s > 0$):**
-   - **Tendency to skid outward ($v > v_{\text{opt}}$):** Friction $f_s$ acts **downward along the incline**:
-     $$f_s = \frac{m(v^2/r)\cos\theta - mg\sin\theta}{\cos\theta + (v^2/rg)\sin\theta}$$
-     Maximum safe speed before outward skidding occurs when $f_s = \mu_s N$:
+4. **Case B: Ideal (Frictionless) Design Speed ($f_s = 0$):**
+   $$f_s = 0 \iff \frac{v^2}{r}\cos\theta - g\sin\theta = 0 \iff \frac{v^2}{r} = g\tan\theta$$
+   $$v_{\text{opt}} = \sqrt{rg\tan\theta}$$
+   At this speed, the normal reaction component $N\sin\theta$ provides exactly the required centripetal force without any lateral tire shear.
+
+5. **Case C: Banked Road Speed Boundaries:**
+   - **Upper Speed Limit $v_{\max}$ (Outward Skidding Threshold, $f_s = +\mu_s N$):**
+     $$m\left[\frac{v^2}{r}\cos\theta - g\sin\theta\right] = \mu_s m\left[\frac{v^2}{r}\sin\theta + g\cos\theta\right]$$
+     $$\frac{v^2}{r}(\cos\theta - \mu_s\sin\theta) = g(\sin\theta + \mu_s\cos\theta)$$
+     Dividing by $\cos\theta$ (for $\mu_s\tan\theta < 1$):
      $$v_{\max} = \sqrt{rg \left(\frac{\tan\theta + \mu_s}{1 - \mu_s\tan\theta}\right)}$$
-     *(Provided $\mu_s \tan\theta < 1$; if $\mu_s \tan\theta \ge 1$, the vehicle will never skid outward regardless of speed).*
-   - **Tendency to slide inward ($v < v_{\text{opt}}$):** Friction $f_s$ acts **upward along the incline**:
-     Minimum safe speed to prevent sliding down into the median (only relevant when $\tan\theta > \mu_s$):
+     *(If $\mu_s\tan\theta \ge 1$, the denominator $\le 0$; the vehicle will never skid outward regardless of speed).*
+   - **Lower Speed Limit $v_{\min}$ (Inward Sliding Threshold, $f_s = -\mu_s N$):**
+     $$m\left[\frac{v^2}{r}\cos\theta - g\sin\theta\right] = -\mu_s m\left[\frac{v^2}{r}\sin\theta + g\cos\theta\right]$$
+     $$\frac{v^2}{r}(\cos\theta + \mu_s\sin\theta) = g(\sin\theta - \mu_s\cos\theta)$$
+     Dividing by $\cos\theta$:
      $$v_{\min} = \sqrt{rg \left(\frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}\right)}$$
-     *(If $\tan\theta \le \mu_s$, gravity component along incline cannot overcome static friction; $v_{\min} = 0$, car remains parked securely).*
+     *(Valid for $\tan\theta > \mu_s$. If $\tan\theta \le \mu_s$, gravity down the incline cannot overcome static friction; $v_{\min} = 0$, and the vehicle remains stationary without sliding).*
 
-5. **Stability & Skid HUD Badges:**
+6. **Stability & Skid HUD Badges:**
    - `SAFE: Balanced (v = v_opt)` (Cyan)
    - `SAFE: Friction Prevents Outward Skid` (Green)
    - `SAFE: Friction Prevents Inward Slide` (Green)
@@ -442,10 +507,10 @@ To match the high analytical standard set by `work-energy-power`, each mode prov
 ### Mode 2 Graphs:
 1. **Tension vs. Angle ($T-\theta$):** Plots instantaneous tension $T(\theta) = \frac{mv^2}{R} + mg\cos\theta$ against polar angle $\theta \in [0, 2\pi]$, showing peak at bottom ($\theta = 0$) and minimum at top ($\theta = \pi$), with explicit $T = 0$ slack boundary.
 2. **Speed vs. Angle ($v-\theta$):** Compares kinetic profile against critical speeds $\sqrt{gR}$ and $\sqrt{5gR}$.
-3. **Energy vs. Time ($E-t$):** Continuous verification that total mechanical energy $E = K + U_g$ remains constant (or tracks step-down dissipation upon string taut jerk).
+3. **Energy vs. Time ($E-t$):** Continuous verification that total mechanical energy $E = K + U_g$ remains constant during smooth circular motion, while recording step-down dissipation $\Delta E = \frac{1}{2}m(v_r^-)^2$ at taut transition events.
 
 ### Mode 3 Graphs:
-1. **Lateral Friction vs. Speed ($f_s-v$):** Plots lateral friction force as a function of speed $v \in [0, v_{\max}]$, highlighting zero-friction crossing at $v = v_{\text{opt}}$ and static limit $f_{s,\max} = \mu_s N$.
+1. **Lateral Friction vs. Speed ($f_s-v$):** Plots signed lateral friction force $f_s = m[(v^2/r)\cos\theta - g\sin\theta]$ as a function of speed $v \in [0, v_{\max}]$, highlighting zero-friction crossing at $v = v_{\text{opt}}$ and static limits $\pm\mu_s N$.
 2. **Forces vs. Banking Angle ($F-\theta$):** Shows trade-off between normal reaction component $N\sin\theta$ and friction requirement across angles $0^\circ\text{--}45^\circ$.
 
 ### Mode 4 Graphs:
@@ -485,13 +550,13 @@ The following test suites must be created to verify the numerical engine prior t
 | `CM-INV-01` | Kinematics | $s = r\theta, v_t = r\omega, v = r\|\omega\|, a_t = r\alpha$ | Exact equality within $10^{-9}$ floating tolerance, properly distinguishing signed velocity from scalar speed. |
 | `CM-INV-02` | Kinematics | $a_c = v^2/r = r\omega^2, \vec{a}_c = -r\omega^2\hat{r}$ | Exact inward radial vector equality across all $r > 0$ and signed $\omega$. |
 | `CM-INV-03` | Non-Uniform | $\vec{a} = \vec{a}_c + \vec{a}_t$, $\|\vec{a}\|^2 = a_c^2 + a_t^2$ | Pythagorean orthogonal sum holds for arbitrary signed $\omega$ and $\alpha \ne 0$. |
-| `CM-INV-04` | Turntable Friction | $F_{\text{required}} = m\sqrt{(r\omega^2)^2 + (r\alpha)^2} > \mu_s mg$ | Static breakaway condition verified, followed by relative slip acceleration $\vec{a} = -\mu_k g \frac{\vec{v}_{\text{rel}}}{\|\vec{v}_{\text{rel}}\|}$. |
-| `CM-INV-05` | Vertical Circle | $E(\theta) = \frac{1}{2}m v(\theta)^2 + mgR(1 - \cos\theta) = E_0$ | Mechanical energy conserved within $0.01\%$ across full loop ($\theta = 0$ at bottom). |
+| `CM-INV-04` | Turntable Breakaway | Breakaway condition: $\|\vec{a}_{\text{surface}}\| > \mu_s g$ | Static breakaway condition verified when $\|\vec{a}_{\text{surface}}\| > \mu_s g$. At $\vec{v}_{\text{rel}} = \vec{0}$, initial slip unit vector is $\hat{u}_{\text{slip}} = -\frac{\vec{a}_{\text{surface}}}{\|\vec{a}_{\text{surface}}\|}$, giving initial $\vec{F}_k = +\mu_k mg \frac{\vec{a}_{\text{surface}}}{\|\vec{a}_{\text{surface}}\|}$, smoothly transitioning to ordinary kinetic friction $\vec{F}_k = -\mu_k mg \frac{\vec{v}_{\text{rel}}}{\|\vec{v}_{\text{rel}}\|}$ when $\|\vec{v}_{\text{rel}}\| > 0$. Resticking when $\|\vec{v}_{\text{rel}}\| \le \epsilon_v$ and $\|\vec{a}_{\text{surface}}\| \le \mu_s g$. |
+| `CM-INV-05` | Vertical Circle | $T - mg\cos\theta = \frac{mv^2}{R} \implies T(\theta) = \frac{mv^2}{R} + mg\cos\theta$ | Verified at bottom ($T - mg = mv^2/R$), horizontal ($T = mv^2/R$), and top ($T + mg = mv^2/R$). Energy conserved ($E = \frac{1}{2}mv^2 + mgR(1 - \cos\theta) = E_0$) within $0.01\%$. |
 | `CM-INV-06` | Vertical Circle | $T_{\text{bottom}} - T_{\text{top}} = 6mg$ | Holds identically for any complete loop with $v_{\text{top}} \ge \sqrt{gR}$ ($v_0 \ge \sqrt{5gR}$). |
-| `CM-INV-07` | Vertical Circle | Slack angle $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR}$ | Tension reaches $0.0\text{ N}$ at $\theta_{\text{slack}}$, triggers projectile flight, and executes taut arrest at $\|\vec{r}\| \ge R, \vec{r}\cdot\vec{v}>0$ with $\vec{v}_{\text{taut}} = v_\theta\hat{\theta}$. |
-| `CM-INV-08` | Banked Curve | Frictionless speed $v_{\text{opt}} = \sqrt{rg\tan\theta}$ | Computed friction $f_s \equiv 0.0\text{ N}$ when $v = v_{\text{opt}}$. |
-| `CM-INV-09` | Banked Curve | $v_{\max} = \sqrt{rg \frac{\tan\theta + \mu_s}{1 - \mu_s\tan\theta}}$ | $f_s$ exactly equals $\mu_s N$ at upper boundary ($\mu_s\tan\theta < 1$). |
-| `CM-INV-10` | Banked Curve | $v_{\min} = \sqrt{rg \frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}}$ | $f_s$ exactly equals $-\mu_s N$ at lower boundary when $\tan\theta > \mu_s$. |
+| `CM-INV-07` | Vertical Circle | Slack angle $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$ | For $\sqrt{2gR} < v_0 < \sqrt{5gR}$, tension strictly vanishes ($T = 0$) at $\theta_{\text{slack}} \in (\pi/2, \pi)$. |
+| `CM-INV-08` | Vertical Circle | Slack-to-taut event localization & impulse | Numerical root localization of $g_{\text{event}}(t) = \|\vec{r}(t)\| - R = 0$ with $\vec{r}\cdot\vec{v} > 0$ within $10^{-6}\text{ s}$; outward radial velocity removed ($v_r^+ \equiv 0$); tangential velocity preserved ($v_\theta^+ = v_\theta^-$); exact energy dissipation $\Delta E_{\text{lost}} = \frac{1}{2}m(v_r^-)^2$; and post-impact tension admissibility verified ($T_{\text{post}} \ge 0 \implies$ arc resumes; $T_{\text{post}} < 0 \implies$ re-slackens). |
+| `CM-INV-09` | Banked Road | $f_s = m[(v^2/r)\cos\theta - g\sin\theta], N = \frac{mg + f_s\sin\theta}{\cos\theta}$ | Exact signed friction matches: $f_s = 0$ at $v_{\text{opt}} = \sqrt{rg\tan\theta}$; $f_s = \frac{mv^2}{r}$ at $\theta = 0$; $f_s > 0$ for $v > v_{\text{opt}}$; $f_s < 0$ for $v < v_{\text{opt}}$; $f_s = +\mu_s N$ at $v_{\max}$; and $f_s = -\mu_s N$ at $v_{\min}$. |
+| `CM-INV-10` | Banked Road | $v_{\max} = \sqrt{rg \frac{\tan\theta + \mu_s}{1 - \mu_s\tan\theta}}, v_{\min} = \sqrt{rg \frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}}$ | Analytical speed boundaries match force equilibrium within $10^{-9}$. |
 | `CM-INV-11` | Conical Pendulum | $T_{\text{period}} = 2\pi\sqrt{\frac{L\cos\theta}{g}} = 2\pi\sqrt{\frac{h}{g}}$ | Independence of mass: changing $m$ alters tension but leaves $T_{\text{period}}$ unchanged. |
 | `CM-INV-12` | Conical Pendulum | Small angle limit: $\frac{T_{\text{conical}}}{T_0} = \sqrt{\cos\theta}$ | Deviation $\le 0.1\%$ for $\theta \le 3^\circ$; deviation $\le 0.2\%$ for $\theta \le 5^\circ$ ($1 - \sqrt{\cos 5^\circ} \approx 0.19\%$). |
 
