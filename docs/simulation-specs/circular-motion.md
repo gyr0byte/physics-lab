@@ -41,7 +41,7 @@ The simulation allows students to experiment with both horizontal and vertical c
      - Top ($\theta = \pi$): $\cos\pi = -1 \implies T + mg = \frac{mv_{\text{top}}^2}{R} \implies T_{\text{top}} = \frac{mv_{\text{top}}^2}{R} - mg$.
    - Comprehensive boundary conditions:
      1. $v_0 = 0$: Bob at rest at bottom ($h = 0, T = mg$).
-     2. $v_0 < \sqrt{2gR}$: Stable oscillatory pendulum regime ($h < R, \theta < \pi/2, T > 0$ strictly at all times).
+     2. $v_0 < \sqrt{2gR}$: Stable oscillatory pendulum regime ($h < R$, turning angle $\theta_{\text{turn}} = \arccos(1 - \frac{v_0^2}{2gR}) < \pi/2$, reachable domain $|\theta| \le \theta_{\text{turn}}$, $T > 0$ strictly at all times).
      3. $v_0 = \sqrt{2gR}$: Boundary state where bob reaches horizontal position $\theta = \pi/2$ ($h = R$) with simultaneous $v = 0$ and $T = 0$.
      4. $\sqrt{2gR} < v_0 < \sqrt{5gR}$: Slackening regime. Tension vanishes ($T = 0$) at slack angle $\theta_{\text{slack}} \in (\pi/2, \pi)$, where $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$. The bob transitions into free parabolic projectile motion under gravity until the string taut transition condition ($g_{\text{event}}(t) = |\vec{r}(t)| - R = 0$ with $\vec{r}\cdot\vec{v} > 0$) is localized, at which point an impulsive radial arrest sets $\vec{v}_{\text{taut}} = v_\theta\hat{\theta}$ with kinetic energy loss $\Delta E = \frac{1}{2}m(\vec{v}\cdot\hat{r})^2$. If post-impact required tension $T_{\text{post}} < 0$, the flexible string immediately re-slackens.
      5. $v_0 \ge \sqrt{5gR}$: Complete circular loop without slackening ($T \ge 0$ throughout), satisfying the classic invariant $T_{\text{bottom}} - T_{\text{top}} = 6mg$.
@@ -250,7 +250,11 @@ A vertical plane apparatus showing a mass $m$ attached to a pivot $(0, 0)$ by a 
   $$h(\theta) = y(\theta) - (-R) = R(1 - \cos\theta)$$
 - Mechanical Energy Conservation:
   $$E = \frac{1}{2}m v_0^2 = \frac{1}{2}m v(\theta)^2 + mgh(\theta) = \frac{1}{2}m v(\theta)^2 + mgR(1 - \cos\theta)$$
-  $$v(\theta) = \sqrt{v_0^2 - 2gR(1 - \cos\theta)}$$
+  $$v(\theta) = \sqrt{q(\theta)}, \quad q(\theta) \equiv v_0^2 - 2gR(1 - \cos\theta)$$
+  where $q(\theta)$ is the **energy radicand** that determines angular reachability:
+  - $q(\theta) > 0$: the angle $\theta$ is energetically reachable; the bob passes through with nonzero speed $v = \sqrt{q}$.
+  - $q(\theta) = 0$: the bob is at a turning point or limiting boundary ($v = 0$).
+  - $q(\theta) < 0$: the angle is **energetically unreachable** under the given $v_0$. The implementation must not evaluate $\sqrt{q}$ for materially negative $q$. Only clamp $q$ to zero when $|q| < \epsilon_q$ (where $\epsilon_q = 10^{-9}\text{ m}^2/\text{s}^2$) to absorb floating-point round-off. If $q < -\epsilon_q$, the engine must recognize the angle as inaccessible and restrict motion to the reachable domain $|\theta| \le \theta_{\text{turn}}$.
 - Radial Dynamic Inward Equilibrium & String Tension:
   Along the unit inward radial direction $-\hat{r} = -\sin\theta\,\hat{i} + \cos\theta\,\hat{j}$:
   - Tension $T$ always acts inward toward the pivot ($+T$).
@@ -286,10 +290,11 @@ A vertical plane apparatus showing a mass $m$ attached to a pivot $(0, 0)$ by a 
 
 2. **Regime 2: Pure Pendulum Oscillation ($0 < v_0 < \sqrt{2gR}$)**
    - The initial energy is insufficient to reach the horizontal line ($h_{\max} = \frac{v_0^2}{2g} < R$).
-   - The bob oscillates symmetrically between $-\theta_{\max}$ and $+\theta_{\max}$, where:
-     $$\cos\theta_{\max} = 1 - \frac{v_0^2}{2gR} > 0 \implies \theta_{\max} < \frac{\pi}{2}$$
-   - Because $\theta \le \theta_{\max} < \frac{\pi}{2}$, $\cos\theta > 0$ everywhere along the trajectory.
-   - Tension $T(\theta) = \frac{mv^2}{R} + mg\cos\theta > 0$ strictly at all times, reaching a minimum at turning points: $T_{\min} = mg\cos\theta_{\max} > 0$. The string never slackens.
+   - The bob oscillates symmetrically between $-\theta_{\text{turn}}$ and $+\theta_{\text{turn}}$, where the turning angle is:
+     $$\theta_{\text{turn}} = \arccos\left(1 - \frac{v_0^2}{2gR}\right) < \frac{\pi}{2}$$
+   - **Energetically Reachable Domain:** The motion is strictly confined to $|\theta| \le \theta_{\text{turn}}$. For any $|\theta| > \theta_{\text{turn}}$, the energy radicand $q(\theta) = v_0^2 - 2gR(1 - \cos\theta) < 0$, making those angles physically inaccessible.
+   - Because $|\theta| \le \theta_{\text{turn}} < \frac{\pi}{2}$, $\cos\theta > 0$ everywhere along the reachable trajectory.
+   - Tension $T(\theta) = \frac{mv^2}{R} + mg\cos\theta > 0$ strictly at all times, reaching a minimum at the turning points: $T_{\min} = mg\cos\theta_{\text{turn}} > 0$. The flexible string never slackens in this regime.
 
 3. **Regime 3: Exact Horizontal Threshold ($v_0 = \sqrt{2gR}$)**
    - The bob reaches exactly the horizontal position $\theta = \pi/2$ ($h = R$).
@@ -342,10 +347,12 @@ A vertical plane apparatus showing a mass $m$ attached to a pivot $(0, 0)$ by a 
      $$T_{\text{bottom}} - T_{\text{top}} = \left(\frac{m v_0^2}{R} + mg\right) - \left(\frac{m (v_0^2 - 4gR)}{R} - mg\right) = 4mg + 2mg = 6mg$$
 
 6. **Rigid Rod Constraint (`Linkage Type = Rigid Rod`):**
-   - A rigid rod can exert normal thrust ($T < 0$, acting in compression).
-   - The bob cannot slacken or enter projectile flight.
-   - The critical threshold to complete a loop is purely kinematic: $v_{\text{top}} \ge 0 \implies v_{0,\text{crit}} = \sqrt{4gR} = 2\sqrt{gR}$.
-   - If $v_0 < 2\sqrt{gR}$, the bob oscillates smoothly like an inverted pendulum.
+   - A rigid rod can pull ($T > 0$, tension) or push ($T < 0$, normal thrust / compression).
+   - The bob cannot slacken or enter projectile flight; flexible-string slackening rules do not apply.
+   - For $0 < v_0 < \sqrt{2gR}$: oscillates symmetrically within $|\theta| \le \theta_{\text{turn}} = \arccos(1 - \frac{v_0^2}{2gR}) < \pi/2$ with $T > 0$ strictly.
+   - For $\sqrt{2gR} \le v_0 < 2\sqrt{gR}$: the bob swings into the upper semicircle $|\theta| \le \theta_{\text{turn}} = \arccos(1 - \frac{v_0^2}{2gR}) \in [\pi/2, \pi)$. Because the constraint force is $T(\theta) = \frac{mq(\theta)}{R} + mg\cos\theta$, the rod enters compression ($T < 0$) in angular regions where $\frac{mq(\theta)}{R} < -mg\cos\theta$, oscillating smoothly like an inverted pendulum without slackening.
+   - The critical threshold to complete a loop is purely kinematic (speed at top remains real and nonnegative): $v_{\text{top}} \ge 0 \implies v_{0,\text{crit}} = \sqrt{4gR} = 2\sqrt{gR}$.
+   - For $v_0 \ge 2\sqrt{gR}$: completes full circular loops. At the top ($\theta = \pi$), $T_{\text{top}} = \frac{m(v_0^2 - 4gR)}{R} - mg$. For $2\sqrt{gR} \le v_0 < \sqrt{5gR}$, $T_{\text{top}} < 0$ (the rod supports the bob under compression at the crest).
 
 ---
 
@@ -505,8 +512,18 @@ To match the high analytical standard set by `work-energy-power`, each mode prov
 3. **Trajectory Phase ($x-y$):** Real-time circular $(x, y)$ orbital trace and breakaway tangent path.
 
 ### Mode 2 Graphs:
-1. **Tension vs. Angle ($T-\theta$):** Plots instantaneous tension $T(\theta) = \frac{mv^2}{R} + mg\cos\theta$ against polar angle $\theta \in [0, 2\pi]$, showing peak at bottom ($\theta = 0$) and minimum at top ($\theta = \pi$), with explicit $T = 0$ slack boundary.
-2. **Speed vs. Angle ($v-\theta$):** Compares kinetic profile against critical speeds $\sqrt{gR}$ and $\sqrt{5gR}$.
+1. **Tension vs. Angle ($T-\theta$) Semantics & Domain Handling:**
+   - **Distinction of Quantities:**
+     - **Required Circular Constraint Force:** $T_{\text{required}}(\theta) = \frac{m q(\theta)}{R} + mg\cos\theta$. This represents the signed radial inward force required to maintain circular motion. A negative value ($T_{\text{required}} < 0$) signifies that maintaining the circular arc would require outward thrust (radial compression).
+     - **Actual Flexible-String Tension:** A flexible string cannot push; its actual tension is strictly non-negative: $T_{\text{string}}(\theta) = \max(0, T_{\text{required}}(\theta))$ during circular contact. When $T_{\text{required}}$ drops to zero, the string slackens ($T_{\text{string}} = 0$), and the bob leaves circular motion into parabolic projectile flight. The graph must **never** display negative values as actual flexible-string tension.
+     - **Rigid-Rod Constraint Force:** A rigid rod supports both tension ($T > 0$) and compression ($T < 0$). For rigid rods, the signed constraint force is plotted directly, with negative values explicitly labeled as compressive thrust.
+   - **Domain & Plotting Rules:**
+     - **Oscillatory Regime ($0 < v_0 < \sqrt{2gR}$):** Plotted only over the reachable domain $|\theta| \le \theta_{\text{turn}} = \arccos(1 - \frac{v_0^2}{2gR}) < \pi/2$. The curve terminates cleanly at $\pm\theta_{\text{turn}}$ with $T_{\min} = mg\cos\theta_{\text{turn}}$. Angles $|\theta| > \theta_{\text{turn}}$ are marked as energetically unreachable.
+     - **Horizontal Threshold ($v_0 = \sqrt{2gR}$):** Plotted over $|\theta| \le \pi/2$, terminating with simultaneous $v = 0$ and $T = 0$ at $\pm\pi/2$.
+     - **Slackening Regime ($\sqrt{2gR} < v_0 < \sqrt{5gR}$, Flexible String):** Plotted along the circular path up to the first slackening event at $\theta_{\text{slack}} = \arccos(-\frac{v_0^2 - 2gR}{3gR}) \in (\pi/2, \pi)$ where $T_{\text{string}} = 0$. During subsequent projectile flight, actual tension is shown as zero ($T = 0$), while $T_{\text{required}} < 0$ may be displayed only as a distinct dashed reference curve labeled "Required constraint (inadmissible for flexible string)".
+     - **Complete Loop Regime ($v_0 \ge \sqrt{5gR}$, Flexible String):** Plotted across the entire circular loop $\theta \in [0, 2\pi]$ where $T \ge 0$ throughout, demonstrating the theoretical tension invariant $T_{\text{bottom}} - T_{\text{top}} = 6mg$.
+     - **Rigid Rod Domain:** Plotted across $|\theta| \le \theta_{\text{turn}}$ (for $v_0 < 2\sqrt{gR}$) or full $[0, 2\pi]$ (for $v_0 \ge 2\sqrt{gR}$), showing continuous transition into compression ($T < 0$) in the upper semicircle.
+2. **Speed vs. Angle ($v-\theta$):** Plots speed $v(\theta) = \sqrt{q(\theta)}$ strictly within reachable angular domains, terminating at $v = 0$ at turning points, and comparing kinetic profiles against critical thresholds $\sqrt{gR}$, $2\sqrt{gR}$, and $\sqrt{5gR}$.
 3. **Energy vs. Time ($E-t$):** Continuous verification that total mechanical energy $E = K + U_g$ remains constant during smooth circular motion, while recording step-down dissipation $\Delta E = \frac{1}{2}m(v_r^-)^2$ at taut transition events.
 
 ### Mode 3 Graphs:
@@ -551,9 +568,9 @@ The following test suites must be created to verify the numerical engine prior t
 | `CM-INV-02` | Kinematics | $a_c = v^2/r = r\omega^2, \vec{a}_c = -r\omega^2\hat{r}$ | Exact inward radial vector equality across all $r > 0$ and signed $\omega$. |
 | `CM-INV-03` | Non-Uniform | $\vec{a} = \vec{a}_c + \vec{a}_t$, $\|\vec{a}\|^2 = a_c^2 + a_t^2$ | Pythagorean orthogonal sum holds for arbitrary signed $\omega$ and $\alpha \ne 0$. |
 | `CM-INV-04` | Turntable Breakaway | Breakaway condition: $\|\vec{a}_{\text{surface}}\| > \mu_s g$ | Static breakaway condition verified when $\|\vec{a}_{\text{surface}}\| > \mu_s g$. At $\vec{v}_{\text{rel}} = \vec{0}$, initial slip unit vector is $\hat{u}_{\text{slip}} = -\frac{\vec{a}_{\text{surface}}}{\|\vec{a}_{\text{surface}}\|}$, giving initial $\vec{F}_k = +\mu_k mg \frac{\vec{a}_{\text{surface}}}{\|\vec{a}_{\text{surface}}\|}$, smoothly transitioning to ordinary kinetic friction $\vec{F}_k = -\mu_k mg \frac{\vec{v}_{\text{rel}}}{\|\vec{v}_{\text{rel}}\|}$ when $\|\vec{v}_{\text{rel}}\| > 0$. Resticking when $\|\vec{v}_{\text{rel}}\| \le \epsilon_v$ and $\|\vec{a}_{\text{surface}}\| \le \mu_s g$. |
-| `CM-INV-05` | Vertical Circle | $T - mg\cos\theta = \frac{mv^2}{R} \implies T(\theta) = \frac{mv^2}{R} + mg\cos\theta$ | Verified at bottom ($T - mg = mv^2/R$), horizontal ($T = mv^2/R$), and top ($T + mg = mv^2/R$). Energy conserved ($E = \frac{1}{2}mv^2 + mgR(1 - \cos\theta) = E_0$) within $0.01\%$. |
+| `CM-INV-05` | Vertical Circle | $T - mg\cos\theta = \frac{mv^2}{R} \implies T(\theta) = \frac{mv^2}{R} + mg\cos\theta$ | Verified at bottom ($T - mg = mv^2/R$), horizontal ($T = mv^2/R$), and top ($T + mg = mv^2/R$). Energy conserved ($E = \frac{1}{2}m v^2 + mgR(1 - \cos\theta) = E_0$) within $0.01\%$ across reachable domain. For $v_0 < \sqrt{2gR}$, turning angle $\theta_{\text{turn}} = \arccos(1 - \frac{v_0^2}{2gR})$ satisfies $q(\theta_{\text{turn}}) = 0$; angles with $q < -\epsilon_q$ are identified as energetically unreachable. |
 | `CM-INV-06` | Vertical Circle | $T_{\text{bottom}} - T_{\text{top}} = 6mg$ | Holds identically for any complete loop with $v_{\text{top}} \ge \sqrt{gR}$ ($v_0 \ge \sqrt{5gR}$). |
-| `CM-INV-07` | Vertical Circle | Slack angle $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$ | For $\sqrt{2gR} < v_0 < \sqrt{5gR}$, tension strictly vanishes ($T = 0$) at $\theta_{\text{slack}} \in (\pi/2, \pi)$. |
+| `CM-INV-07` | Vertical Circle | Slack angle $\cos\theta_{\text{slack}} = -\frac{v_0^2 - 2gR}{3gR} \in (-1, 0)$ & Tension Semantics | For $\sqrt{2gR} < v_0 < \sqrt{5gR}$, flexible string tension strictly vanishes ($T_{\text{string}} = 0$) at $\theta_{\text{slack}} \in (\pi/2, \pi)$. Actual string tension remains non-negative ($T_{\text{string}} = 0$ during slack flight), while required constraint force $T_{\text{required}} < 0$. Rigid rod supports compression ($T < 0$) without slackening, completing loops for $v_0 \ge 2\sqrt{gR}$. |
 | `CM-INV-08` | Vertical Circle | Slack-to-taut event localization & impulse | Numerical root localization of $g_{\text{event}}(t) = \|\vec{r}(t)\| - R = 0$ with $\vec{r}\cdot\vec{v} > 0$ within $10^{-6}\text{ s}$; outward radial velocity removed ($v_r^+ \equiv 0$); tangential velocity preserved ($v_\theta^+ = v_\theta^-$); exact energy dissipation $\Delta E_{\text{lost}} = \frac{1}{2}m(v_r^-)^2$; and post-impact tension admissibility verified ($T_{\text{post}} \ge 0 \implies$ arc resumes; $T_{\text{post}} < 0 \implies$ re-slackens). |
 | `CM-INV-09` | Banked Road | $f_s = m[(v^2/r)\cos\theta - g\sin\theta], N = \frac{mg + f_s\sin\theta}{\cos\theta}$ | Exact signed friction matches: $f_s = 0$ at $v_{\text{opt}} = \sqrt{rg\tan\theta}$; $f_s = \frac{mv^2}{r}$ at $\theta = 0$; $f_s > 0$ for $v > v_{\text{opt}}$; $f_s < 0$ for $v < v_{\text{opt}}$; $f_s = +\mu_s N$ at $v_{\max}$; and $f_s = -\mu_s N$ at $v_{\min}$. |
 | `CM-INV-10` | Banked Road | $v_{\max} = \sqrt{rg \frac{\tan\theta + \mu_s}{1 - \mu_s\tan\theta}}, v_{\min} = \sqrt{rg \frac{\tan\theta - \mu_s}{1 + \mu_s\tan\theta}}$ | Analytical speed boundaries match force equilibrium within $10^{-9}$. |
@@ -566,7 +583,10 @@ The following test suites must be created to verify the numerical engine prior t
 
 1. **Singularities at Zero Radius:** Clamp $r \ge 0.10\text{ m}$ to prevent $\frac{v^2}{r}$ division by zero.
 2. **Steep Banking Asymptote:** When $\mu_s \tan\theta \ge 1.0$, $v_{\max} \to \infty$; the engine must handle this gracefully without emitting `NaN` or `Infinity`, displaying `No Outward Skid Limit`.
-3. **Vertical Loop Energy Deficit:** If $v_0 < \sqrt{2gR}$, top cannot be reached; avoid taking square root of negative numbers when computing $v(\theta)$ by clamping radicand to zero.
+3. **Energy Radicand & Angular Reachability Domain:** The speed equation $v(\theta) = \sqrt{q(\theta)}$ with $q(\theta) \equiv v_0^2 - 2gR(1 - \cos\theta)$ strictly governs physical reachability:
+   - For $q(\theta) > 0$, the angle is energetically accessible with real speed $v > 0$.
+   - For $q(\theta) = 0$, the bob is at a turning boundary $\pm\theta_{\text{turn}}$ ($v = 0$).
+   - For $q(\theta) < 0$, the angle is physically inaccessible. The engine must **never** clamp materially negative radicands ($q < -\epsilon_q$) to zero to fabricate a false zero-speed physical state at an unreachable angle. Clamping to zero is restricted strictly to numerical round-off $|q| < \epsilon_q$ (with $\epsilon_q = 10^{-9}\text{ m}^2/\text{s}^2$) in the immediate neighborhood of true turning angles. Outside the reachable domain $|\theta| \le \theta_{\text{turn}}$, the angle is treated as inaccessible by both the physics solver and graph renderers.
 4. **Time Integration:** Semi-implicit Euler or Velocity Verlet integration with fixed sub-stepping ($\Delta t = 0.002\text{ s}$) to prevent numerical orbit drift over long run times.
 5. **Non-Finite Protection:** All Canvas coordinates must pass `Number.isFinite(...)` validation before invoking Canvas drawing APIs.
 
