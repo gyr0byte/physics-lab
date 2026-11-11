@@ -245,3 +245,20 @@ simulation-web/
 | Vite | 8.3.x |
 | Vitest | 5.0.x |
 
+## Production Build Integrity
+
+Before shipping an APK/AAB release, verify:
+
+- No localhost or dev server URLs in bundled assets.
+- No unnecessary debug logging, test chapter placeholders, or production debug banners.
+- No broken asset paths, missing fonts/images, or accidental runtime CDN/network dependencies.
+- Version code/name updated, TV banner/app icon present, and `THIRD-PARTY-NOTICES` / license notices current.
+
+## Future Architecture Boundaries (V2+)
+
+Future classroom features should compose cleanly on top of Version 1 without rewriting simulation models:
+
+- **Teacher / Presentation Mode:** Hide advanced controls, lock parameters, and launch preconfigured guided states via simulation configuration rather than forked physics code.
+- **Mobile Companion Controller:** Keep core simulation APIs decoupled from input source (`InputManager`) so network/remote input events require no changes to physics modules.
+- **Formative Assessment Layer:** Evaluate student answers by reading live simulation state rather than duplicating independent physics equations (`simulation state -> assessment evaluator -> result`).
+
